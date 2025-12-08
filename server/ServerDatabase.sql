@@ -5,7 +5,10 @@ CREATE TABLE IF NOT EXISTS user(
 	id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
 	mail varchar(100) NOT NULL,
 	paswd varchar(256) NOT NULL,
-	public_key varchar(500) NOT NULL
+	salt varchar(512) NOT NULL,
+	public_key varchar(512) NOT NULL,
+	nickname varchar(42) NOT NULL PRIMARY KEY,
+	pfp varchar(200) PRIMARY KEY
 );
 
 CREATE TABLE IF NOT EXISTS chats(

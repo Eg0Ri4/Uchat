@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("UChatServer")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+500063c09fd08c3960906877af291e7d95fd07b5")]
 [assembly: System.Reflection.AssemblyProductAttribute("UChatServer")]
 [assembly: System.Reflection.AssemblyTitleAttribute("UChatServer")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
