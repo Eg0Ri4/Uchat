@@ -1,13 +1,13 @@
-using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Markup.Xaml;
 
-namespace client;
-
-public partial class ForgotPasswordView : UserControl
+namespace client.Views // 👈 ПРАВИЛЬНИЙ NAMESPACE
 {
-    public ForgotPasswordView()
+    // 'partial' обов'язковий для Avalonia
+    public partial class ForgotPasswordView : UserControl // 👈 ПРАВИЛЬНА НАЗВА КЛАСУ
     {
-        InitializeComponent();
+        public ForgotPasswordView()
+        {
+            InitializeComponent(); // Ця функція запрацює
+        }
     }
 }

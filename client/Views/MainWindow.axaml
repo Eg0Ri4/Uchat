@@ -9,14 +9,13 @@
         Title="Uchat"
         TransparencyLevelHint="AcrylicBlur"
         Background="Black"  ExtendClientAreaToDecorationsHint="True">
-    
     <Grid>
-        
+    
         <Image Source="/Assets/Images/background.png" 
                Stretch="UniformToFill" 
                Opacity="0.3"/> 
                
-        <views:LoginView />
+        <views:ForgotPasswordView /> 
+    
     </Grid>
-
 </Window>

@@ -1,8 +1,176 @@
-<UserControl xmlns="https://github.com/avaloniaui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
-             x:Class="client.SignUpView">
-  Welcome to Avalonia!
+<UserControl
+  x:Class="client.Views.SignUpView"
+  xmlns="https://github.com/avaloniaui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+  d:DesignHeight="600"
+  d:DesignWidth="800"
+  mc:Ignorable="d">
+
+  <UserControl.Styles>
+
+    <Style Selector="TextBox">
+      <Setter Property="Background" Value="#2B2B2B" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="CaretBrush" Value="White" />
+      <Setter Property="BorderBrush" Value="#2B2B2B" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+
+    <Style Selector="TextBox:pointerover">
+      <Setter Property="Background" Value="#2B2B2B" />
+      <Setter Property="BorderBrush" Value="#2B2B2B" />
+    </Style>
+
+    <Style Selector="TextBox:focus">
+      <Setter Property="Background" Value="#3A3A3A" />
+      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="BorderBrush" Value="#00FFFF" /> 
+    </Style>
+
+    <Style Selector="TextBox /template/ Button#RevealButton /template/ Path">
+      <Setter Property="Fill" Value="White" />
+    </Style>
+
+
+    <Style Selector="CheckBox /template/ ContentPresenter">
+      <Setter Property="Foreground" Value="#888888" />
+    </Style>
+    <Style Selector="CheckBox:pointerover /template/ ContentPresenter">
+      <Setter Property="Foreground" Value="#888888" />
+    </Style>
+    <Style Selector="CheckBox:pressed /template/ ContentPresenter">
+      <Setter Property="Foreground" Value="#888888" />
+    </Style>
+
+  </UserControl.Styles>
+
+  <Grid>
+    <Border
+      Width="400"
+      Padding="40"
+      HorizontalAlignment="Center"
+      VerticalAlignment="Center"
+      Background="#1F1F1F"
+      BoxShadow="0 0 20 0 #000000"
+      CornerRadius="20">
+
+      <StackPanel Spacing="15">
+
+        <StackPanel
+          Margin="0,0,0,20"
+          HorizontalAlignment="Center"
+          Orientation="Horizontal"
+          Spacing="5">
+
+          <Grid
+            Width="30"
+            Height="30"
+            VerticalAlignment="Center">
+            <Image Source="/Assets/Images/Logo.png" Stretch="UniformToFill" />
+            <TextBlock
+              Margin="-10,0,0,0"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center"
+              FontSize="18"
+              FontWeight="Bold"
+              Foreground="Black"
+              Text="U" />
+          </Grid>
+
+          <TextBlock
+            VerticalAlignment="Center"
+            FontSize="24"
+            FontWeight="SemiBold"
+            Foreground="White"
+            Text="Chat" />
+        </StackPanel>
+
+        <TextBlock
+          FontSize="28"
+          FontWeight="Bold"
+          Foreground="White"
+          Text="Sign up" />
+        <TextBlock
+          Margin="0,0,0,10"
+          FontSize="14"
+          Foreground="#888888"
+          Text="Join the messenger — connect instantly." />
+
+        <TextBlock
+          FontSize="12"
+          Foreground="#AAAAAA"
+          Text="Username *"
+           />
+        <TextBox
+          Height="40"
+          CornerRadius="8"
+          Watermark="Username"
+           />
+
+        <TextBlock
+          FontSize="12"
+          Foreground="#AAAAAA"
+          Text="Email *" />
+        <TextBox
+          Height="40"
+          CornerRadius="8"
+          Watermark="Email" />
+
+        <TextBlock
+          FontSize="12"
+          Foreground="#AAAAAA"
+          Text="Password *" />
+        <TextBox
+          Height="40"
+          CornerRadius="8"
+          PasswordChar="•"
+          RevealPassword="True"
+          Watermark="Password" />
+
+        <StackPanel Margin="0,-5,0,5" Orientation="Horizontal">
+          <CheckBox Content="I agree with" Foreground="#f8f8f8ff" />
+          <Button
+            Margin="50,0,0,0"
+            Padding="0"
+            VerticalAlignment="Center"
+            Background="Transparent"
+            BorderThickness="0"
+            Content="Terms and Privacy"
+            FontSize="12"
+            FontWeight="Bold"
+            Foreground="#D25B5B" />
+        </StackPanel>
+
+        <Button
+          Width="320"
+          Height="45"
+          Margin="0,10,0,0"
+          HorizontalAlignment="Center"
+          HorizontalContentAlignment="Center"
+          VerticalContentAlignment="Center"
+          Background="White"
+          Content="Sign up"
+          CornerRadius="25"
+          FontWeight="Bold"
+          Foreground="Black" />
+
+        <StackPanel
+          Margin="0,15,0,0"
+          HorizontalAlignment="Center"
+          Orientation="Horizontal">
+          <TextBlock Foreground="#888888" Text="Already have account?" />
+          <Button
+            Padding="5,0,0,0"
+            Background="Transparent"
+            BorderThickness="0"
+            Content="Sign in"
+            FontWeight="Bold"
+            Foreground="White" />
+        </StackPanel>
+
+      </StackPanel>
+    </Border>
+  </Grid>
 </UserControl>

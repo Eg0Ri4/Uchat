@@ -1,13 +1,12 @@
-using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Markup.Xaml;
 
-namespace client;
-
-public partial class SignUpView : UserControl
+namespace client.Views
 {
-    public SignUpView()
+    public partial class SignUpView : UserControl // 👈 ПОВИННО БУТИ ТАК!
     {
-        InitializeComponent();
+        public SignUpView()
+        {
+            InitializeComponent();
+        }
     }
 }
