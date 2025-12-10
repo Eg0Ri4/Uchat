@@ -21,9 +21,7 @@ public class DaemonWorker : BackgroundService
             _logger.LogInformation("Daemon Service is healthy at: {time}", DateTimeOffset.Now);
 
             // Optional: Send a system message to chat every 60 seconds
-            await _hubContext.Clients.All.SendAsync("ReceiveMessage", "SYSTEM", "Server is active...", stoppingToken);
-
-            // Wait 60 seconds so we don't interrupt the chat
+            //await _hubContext.Clients.All.SendAsync("ReceiveMessage", "SYSTEM", "Server is active...", stoppingToken);
             await Task.Delay(60000, stoppingToken);
         }
     }

@@ -3,12 +3,12 @@ USE UChat;
 
 CREATE TABLE IF NOT EXISTS user(
 	id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
-	mail varchar(100) NOT NULL,
+	mail varchar(100) NOT NULL UNIQUE,
 	paswd varchar(256) NOT NULL,
-	salt varchar(512) NOT NULL,
+	salt varchar(256) NOT NULL,
 	public_key varchar(512) NOT NULL,
-	nickname varchar(42) NOT NULL PRIMARY KEY,
-	pfp varchar(200) PRIMARY KEY
+	nickname varchar(42) NOT NULL UNIQUE,
+	pfp varchar(200) UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS chats(

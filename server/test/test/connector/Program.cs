@@ -1,9 +1,12 @@
 using Microsoft.AspNetCore.SignalR.Client;
 using connector;
 
+//input demo
+/*
 Console.Write("Enter your username: ");
 string username = Console.ReadLine() ?? "Unknown";
 Console.WriteLine($"--- Connecting as {username} ---");
+*/
 
 // Configure connection with our custom "Forever Retry" policy
 var connection = new HubConnectionBuilder()
@@ -40,7 +43,25 @@ connection.On<string, string>("ReceiveMessage", (user, message) =>
 // Initial Connect
 await ConnectWithRetryAsync(connection);
 
-while (true)
+//demo logIn
+/*
+try
+{ await connection.InvokeAsync("LogIn", "hui", "hui".Trim()); }
+catch
+{ Console.WriteLine("Failed to send."); }
+*/
+
+//demo register
+/*
+try
+{ await connection.InvokeAsync("register", "hui", "hui", "hui"); }
+catch
+{ Console.WriteLine("Failed to send."); }
+*/
+
+
+//demo
+/*while (true)
 {
     string? message = Console.ReadLine();
 
@@ -48,7 +69,7 @@ while (true)
     {
         if (connection.State != HubConnectionState.Connected)
         {
-            Console.WriteLine("Server is down. Message not sent.");
+            Console.WriteLine("Server is down.");
         }
         else
         {
@@ -57,7 +78,7 @@ while (true)
             Console.Write("You: ");
         }
     }
-}
+}*/
 
 // --- PART 2: HELPER METHODS & CLASSES (Must be at the bottom) ---
 

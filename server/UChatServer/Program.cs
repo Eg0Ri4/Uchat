@@ -1,23 +1,31 @@
 using UChatServer;
 using Microsoft.AspNetCore.SignalR;
+using System.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Systemd Integration
+// --- 1. Get & Print PID ---
+int pid = Environment.ProcessId;
+Console.WriteLine($"[System] Process ID: {pid}");
+
+// --- 2. Handle Port Argument 
+int port = 5000; 
+if (args.Length > 0 && int.TryParse(args[0], out int customPort))
+{
+    port = customPort;
+}
+Console.WriteLine($"[System] Listening on Port: {port}");
+
+// --- 3. Setup Services ---
 builder.Services.AddSystemd();
-
-// 2. Add SignalR
 builder.Services.AddSignalR();
-
-// 3. Add the Background Worker
 builder.Services.AddHostedService<DaemonWorker>();
 
-// 4. Configure Port 5000
-builder.WebHost.ConfigureKestrel(opts => opts.ListenAnyIP(5000));
+builder.WebHost.ConfigureKestrel(opts => opts.ListenAnyIP(port));
 
 var app = builder.Build();
 
-// 5. Route the Hub
 app.MapHub<DaemonHub>("/hubs/daemon");
 
 app.Run();
+
