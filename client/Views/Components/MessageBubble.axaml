@@ -1,0 +1,25 @@
+<UserControl
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="clr-namespace:client.Converters"
+    x:Class="client.Views.Components.MessageBubble">
+
+	<Border
+        Background="{Binding BubbleColor}"
+        CornerRadius="14"
+        Padding="14"
+        HorizontalAlignment="{Binding IsIncoming, Converter={StaticResource BoolToAlignmentConverter}}">
+
+		<StackPanel>
+			<TextBlock Text="{Binding MessageText}"
+                       Foreground="White"
+                       FontSize="16"/>
+
+			<TextBlock Text="{Binding Time}"
+                       Foreground="#bbb"
+                       HorizontalAlignment="Right"/>
+		</StackPanel>
+
+	</Border>
+
+</UserControl>

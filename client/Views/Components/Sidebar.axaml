@@ -1,0 +1,12 @@
+﻿<UserControl
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:Class="client.Views.Components.Sidebar">
+
+	<Border Background="#111" Padding="20">
+		<StackPanel>
+			<TextBlock Text="My accounts 🔒" Foreground="White" FontSize="20"/>
+		</StackPanel>
+	</Border>
+
+</UserControl>

@@ -1,0 +1,30 @@
+﻿<UserControl
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:Class="client.Views.Components.MessageInput">
+
+	<Border Background="#111" Padding="10">
+		<Grid ColumnDefinitions="*,Auto">
+
+			<!-- Text Field -->
+			<TextBox x:Name="InputBox"
+                     Watermark="Write a message..."
+                     Background="#222"
+                     Foreground="White"
+                     BorderBrush="#444"
+                     CornerRadius="10"
+                     Padding="10"/>
+
+			<!-- Send Button -->
+			<Button Grid.Column="1"
+                    Background="#660066"
+                    Foreground="White"
+                    Padding="12"
+                    Margin="10,0,0,0">
+				Send
+			</Button>
+
+		</Grid>
+	</Border>
+
+</UserControl>

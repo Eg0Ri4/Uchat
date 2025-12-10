@@ -13,9 +13,9 @@
     
         <Image Source="/Assets/Images/background.png" 
                Stretch="UniformToFill" 
-               Opacity="0.3"/> 
-               
-        <views:ForgotPasswordView /> 
+               Opacity="0.3"/>
+
+		<views:ChatPage /> 
     
     </Grid>
 </Window>

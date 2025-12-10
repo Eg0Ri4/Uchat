@@ -1,0 +1,36 @@
+<UserControl
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:client.Views.Components"
+    xmlns:vm="using:client.ViewModels"
+    x:Class="client.Views.ChatPage">
+
+	<UserControl.DataContext>
+		<vm:ChatPageViewModel/>
+	</UserControl.DataContext>
+
+	<Grid ColumnDefinitions="320,*">
+
+		<!-- SIDEBAR -->
+		<local:Sidebar Grid.Column="0"/>
+
+		<!-- CHAT AREA -->
+		<Grid Grid.Column="1" RowDefinitions="60,*,Auto">
+
+			<!-- TOP BAR -->
+			<local:TopBar Grid.Row="0"/>
+
+			<!-- MESSAGE LIST -->
+			<ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+				<ItemsControl ItemsSource="{Binding Messages}">
+					<ItemsControl.ItemTemplate>
+						<DataTemplate>
+							<local:MessageBubble/>
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+				</ItemsControl>
+			</ScrollViewer>
+
+		</Grid>
+	</Grid>
+</UserControl>
