@@ -1,154 +1,237 @@
-using Microsoft.AspNetCore.SignalR.Client;
-using connector; // Ensure this matches your namespace
+using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.SignalR.Client;
+using connector; // Ensure this matches your namespace for CryptographyService
 
 // --- 1. CONFIGURATION ---
 string serverIp = "localhost";
 int serverPort = 5000;
-if (args.Length > 0) serverIp = args[0];
-if (args.Length > 1 && int.TryParse(args[1], out int p)) serverPort = p;
-
 string hubUrl = $"http://{serverIp}:{serverPort}/hubs/daemon";
-Console.WriteLine($"Target Server: {hubUrl}");
 
-// --- 2. BUILD CONNECTION ---
+// --- 2. CLIENT STATE ---
+int myId = -1;
+string myNick = "Guest";
+string ActiveMail = "guest@mail.com";
+Dictionary<string, int> activeChats = new Dictionary<string, int>();
+
+// --- 3. CONNECTION SETUP ---
 var connection = new HubConnectionBuilder()
     .WithUrl(hubUrl)
     .WithAutomaticReconnect(new InfiniteRetryPolicy())
     .Build();
 
-// --- 3. REGISTER LISTENERS ---
+// --- 4. REGISTER LISTENERS ---
 
-// A. Standard Plaintext/System Messages
-connection.On<string, string>("ReceiveSystem", (user, message) =>
+// A. Login Success
+connection.On<int, string>("LoginSuccess", (id, nick) =>
 {
-    Console.WriteLine($"\r[{user}]: {message}");
+    myId = id;
+    myNick = nick;
+    Console.WriteLine($"\n[System] Logged in as {myNick} (ID: {myId})");
+    Console.Write($"{myNick}> ");
 });
 
-// B. Secure Messages (THE TEST TARGET)
+// B. Search Results
+connection.On<List<string>>("ReceiveSearchResults", (users) =>
+{
+    Console.WriteLine($"\n--- Users Found ---");
+    foreach (var u in users) Console.WriteLine($" - {u}");
+    Console.WriteLine("-------------------");
+    Console.Write($"{myNick}> ");
+});
+
+// C. Chat Created
+connection.On<int, string>("ChatCreated", (chatId, targetNick) =>
+{
+    activeChats[targetNick] = chatId;
+    Console.WriteLine($"\n[System] Secure Chat #{chatId} established with {targetNick}.");
+    Console.Write($"{myNick}> ");
+});
+
+// D. Receive Secure Message (AUTO-DECRYPT)
 connection.On<string, string, string, string>("ReceiveSecureMessage", (sender, cipherText, iv, myEncryptedKey) =>
 {
+    // Don't overwrite the prompt while typing, just print a new line
+    Console.WriteLine(); 
+
     try 
     {
-        if (!File.Exists("private.key")) 
+        if (!File.Exists($"{ActiveMail}.key")) 
         {
-            Console.WriteLine($"\r[{sender}]: [LOCKED - No Private Key Found]");
-            Console.Write("You: ");
-            return;
+            Console.WriteLine($"[{sender}]: [LOCKED - No Private Key Found]");
         }
+        else
+        {
+            string myPrivKey = File.ReadAllText("private.key");
 
-        string myPrivKey = File.ReadAllText("private.key");
+            // 1. Decrypt the shared Session Key using our Private Key (RSA)
+            byte[] sessionKey = CryptographyService.DecryptSessionKey(myEncryptedKey, myPrivKey);
 
-        // 1. Unlock the Session Key (RSA)
-        byte[] sessionKey = CryptographyService.DecryptSessionKey(myEncryptedKey, myPrivKey);
+            // 2. Decrypt the actual Message using the Session Key (AES)
+            string plainText = CryptographyService.DecryptMessage(cipherText, iv, sessionKey);
 
-        // 2. Unlock the Message (AES)
-        string plainText = CryptographyService.DecryptMessage(cipherText, iv, sessionKey);
-
-        Console.WriteLine($"\r[{sender} 🔒]: {plainText}");
+            // 3. Display Cleartext
+            Console.WriteLine($"[{sender} 🔒]: {plainText}");
+        }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"\r[{sender}]: [Decryption Failed: {ex.Message}]");
+        Console.WriteLine($"[{sender}]: [Decryption Failed: {ex.Message}]");
     }
-    Console.Write("You: ");
+    
+    // Restore prompt
+    if (myId != -1) Console.Write($"{myNick}> ");
 });
 
-// C. Private Key Receipt
+// E. System Messages
+connection.On<string, string>("ReceiveSystem", (user, message) =>
+{
+    Console.WriteLine($"\r[{user}]: {message}");
+    if (myId != -1) Console.Write($"{myNick}> ");
+});
+
+// F. Save Private Key (On Registration)
 connection.On<string>("ReceivePrivateKey", (key) =>
 {
-    Console.WriteLine($"\n[System] REGISTRATION SUCCESS!");
-    File.WriteAllText("private.key", key);
-    Console.WriteLine($"[System] Private Key saved to 'private.key'");
-    Console.Write("You: ");
+    File.WriteAllText($"{ActiveMail}.key", key);
+    Console.WriteLine($"[System] Registration Successful. Key saved to '{ActiveMail}.key'");
+    Console.Write($"{myNick}> ");
 });
-
-// D. Connection Lifecycle
-connection.Reconnecting += error => { Console.WriteLine($"\nReconnecting..."); return Task.CompletedTask; };
-connection.Reconnected += id => { Console.WriteLine($"\nRestored!"); Console.Write("You: "); return Task.CompletedTask; };
 
 await ConnectWithRetryAsync(connection);
 
-// --- 4. MAIN COMMAND LOOP ---
+// --- 5. MAIN LOOP ---
 Console.WriteLine("\n--- COMMANDS ---");
-Console.WriteLine("/register [email] [password] [nickname]");
-Console.WriteLine("/login [email] [password]");
-Console.WriteLine("/msg [nickname] [message]");
+Console.WriteLine("/register [email] [pass] [nick]");
+Console.WriteLine("/login [email] [pass]");
+Console.WriteLine("/search [partial_nick]");
+Console.WriteLine("/chat [target_nick]        -> Start a room");
+Console.WriteLine("/msg [target_nick] [text]  -> Send encrypted message");
+Console.WriteLine("/history [target_nick]     -> Read past messages");
 Console.WriteLine("----------------\n");
-
-string currentUser = "Guest";
 
 while (true)
 {
-    Console.Write("You: ");
+    Console.Write($"{myNick}> ");
     string? input = Console.ReadLine();
     if (string.IsNullOrWhiteSpace(input)) continue;
-    
-    // --- REGISTER ---
-    if (input.StartsWith("/register"))
-    {
-        var parts = input.Split(' ');
-        if (parts.Length < 4) { Console.WriteLine("Usage: /register email pass nick"); continue; }
-        await connection.InvokeAsync("Register", parts[3], parts[1], parts[2]); // nick, mail, pass
-        currentUser = parts[3];
-    }
-    // --- LOGIN ---
-    else if (input.StartsWith("/login"))
-    {
-        var parts = input.Split(' ');
-        if (parts.Length < 3) { Console.WriteLine("Usage: /login email pass"); continue; }
-        await connection.InvokeAsync("LogIn", parts[1], parts[2]);
-        
-        // Optional: Fetch History here
-    }
-    // --- SECURE MESSAGE ---
-    else if (input.StartsWith("/msg"))
-    {
-        // Usage: /msg Bob Hello World
-        var parts = input.Split(' ', 3);
-        if (parts.Length < 3) { Console.WriteLine("Usage: /msg Bob Hello World"); continue; }
 
-        string target = parts[1];
-        string messageText = parts[2];
-        var recipients = new List<string> { target, currentUser }; // Add self for history
+    string[] parts = input.Split(' ');
+    string cmd = parts[0].ToLower();
 
-        Console.WriteLine("[System] Encrypting...");
-
-        try 
+    try 
+    {
+        if (cmd == "/login")
         {
-            // 1. Get Public Keys
-            var keys = await connection.InvokeAsync<Dictionary<string, string>>("GetPublicKeys", recipients);
+            if (parts.Length < 3) Console.WriteLine("Usage: /login email pass");
+            else await connection.InvokeAsync("LogIn", parts[1], parts[2]);
+            ActiveMail = parts[1];
+        }
+        else if (cmd == "/register")
+        {
+            if (parts.Length < 4) Console.WriteLine("Usage: /register email pass nick");
+            else await connection.InvokeAsync("register", parts[1], parts[2], parts[3]);
+            ActiveMail = parts[1];
+        }
+        else if (cmd == "/search")
+        {
+            if (parts.Length < 2) Console.WriteLine("Usage: /search partialName");
+            else await connection.InvokeAsync("SearchUsers", parts[1]);
+        }
+        else if (cmd == "/chat")
+        {
+            if (myId == -1) { Console.WriteLine("Login first."); continue; }
+            if (parts.Length < 2) Console.WriteLine("Usage: /chat targetNick");
+            else await connection.InvokeAsync("InitPrivateChat", parts[1], myId);
+        }
+        else if (cmd == "/msg")
+        { 
+            if (myId == -1) { Console.WriteLine("Login first."); continue; }
+            if (parts.Length < 3) { Console.WriteLine("Usage: /msg targetNick Hello World"); continue; }
 
-            // 2. Encrypt
-            byte[] sessionKey = CryptographyService.GenerateSessionKey();
-            var encryptedBody = CryptographyService.EncryptMessage(messageText, sessionKey);
+            string targetNick = parts[1];
+            string messageText = string.Join(" ", parts.Skip(2));
 
-            var keyBundle = new Dictionary<string, string>();
-            foreach (var user in keys)
+            if (!activeChats.ContainsKey(targetNick))
             {
-                keyBundle[user.Key] = CryptographyService.EncryptSessionKey(sessionKey, user.Value);
+                Console.WriteLine($"[Error] You haven't started a chat with {targetNick} yet.");
+                Console.WriteLine($"Type '/chat {targetNick}' to initialize the session.");
+                continue;
             }
 
-            // 3. Send
-            await connection.InvokeAsync("SendSecureMessage", currentUser, encryptedBody.CipherText, encryptedBody.IV, keyBundle);
-            Console.WriteLine($"[System] Sent secure message.");
+            int chatId = activeChats[targetNick];
+            
+            var recipients = new List<string> { targetNick, myNick };
+
+            Console.WriteLine("[System] Encrypting...");
+
+            // 2. Generate a One-Time Session Key (AES)
+            byte[] sessionKey = CryptographyService.GenerateSessionKey();
+
+            // 3. Encrypt the Message Body with this Session Key
+            var encryptedBody = CryptographyService.EncryptMessage(messageText, sessionKey);
+
+            // 4. Encrypt the Session Key for EACH recipient using their Public Key
+            var keyBundle = new Dictionary<string, string>();
+            
+            foreach (var user in recipients)
+            {
+                string pk = await connection.InvokeAsync<string>("GetPublicKey", user);
+                
+                if (pk != "NOT_FOUND")
+                {
+                    // Encrypt AES key with RSA Public Key
+                    string encryptedSessionKey = CryptographyService.EncryptSessionKey(sessionKey, pk);
+                    keyBundle[user] = encryptedSessionKey;
+                }
+            }
+            
+            await connection.InvokeAsync("SendSecureMessage", chatId, myId, myNick, encryptedBody.CipherText, encryptedBody.IV, keyBundle);
+            
+            Console.WriteLine($"[System] Message sent to chat #{chatId}.");
+            // --- FIX END ---
         }
-        catch (Exception ex)
+        else if (cmd == "/history")
         {
-            Console.WriteLine($"[Error] {ex.Message}");
+             if (myId == -1) { Console.WriteLine("Login first."); continue; }
+             if (parts.Length < 2) { Console.WriteLine("Usage: /history targetNick"); continue; }
+             
+             string targetNick = parts[1];
+             if (!activeChats.ContainsKey(targetNick)) { Console.WriteLine("Chat not initialized."); continue; }
+
+             int chatId = activeChats[targetNick];
+             var history = await connection.InvokeAsync<List<HistoryItem>>("GetChatHistory", chatId, myId);
+
+             Console.WriteLine($"\n--- History with {targetNick} ---");
+             foreach(var item in history)
+             {
+                 try {
+                     if(File.Exists("private.key")) {
+                        string myPriv = File.ReadAllText("private.key");
+                        // Decrypt Key -> Decrypt Message
+                        var sessKey = CryptographyService.DecryptSessionKey(item.MyEncryptedKey, myPriv);
+                        var txt = CryptographyService.DecryptMessage(item.CipherText, item.IV, sessKey);
+                        
+                        Console.WriteLine($"[{item.Timestamp.ToShortTimeString()}] {item.Sender}: {txt}");
+                     } else {
+                        Console.WriteLine($"[{item.Timestamp.ToShortTimeString()}] {item.Sender}: [LOCKED]");
+                     }
+                 } catch {
+                     Console.WriteLine($"[{item.Timestamp.ToShortTimeString()}] {item.Sender}: [Decryption Error]");
+                 }
+             }
+             Console.WriteLine("-------------------------------");
         }
     }
-    // --- PLAIN MESSAGE ---
-    else
+    catch (Exception ex)
     {
-        if (connection.State == HubConnectionState.Connected)
-            await connection.InvokeAsync("SendMessage", currentUser, input);
-        else
-            Console.WriteLine("[System] Disconnected.");
+        Console.WriteLine($"[Error] {ex.Message}");
     }
 }
 
-// --- HELPERS ---
 async Task ConnectWithRetryAsync(HubConnection connection)
 {
     while (true)
@@ -161,8 +244,8 @@ async Task ConnectWithRetryAsync(HubConnection connection)
         }
         catch
         {
-            Console.WriteLine($"Server unavailable. Retrying in 5s...");
-            await Task.Delay(5000);
+            Console.WriteLine($"Server unavailable. Retrying in 3s...");
+            await Task.Delay(3000);
         }
     }
 }
@@ -172,9 +255,9 @@ public class InfiniteRetryPolicy : IRetryPolicy
     public TimeSpan? NextRetryDelay(RetryContext retryContext) => TimeSpan.FromSeconds(5);
 }
 
-// Simple DTO for history if you use it later
-public class HistoryItem 
+public class HistoryItem
 {
+    public long MessageId { get; set; }
     public string Sender { get; set; }
     public string CipherText { get; set; }
     public string IV { get; set; }
