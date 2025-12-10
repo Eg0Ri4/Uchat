@@ -3,10 +3,55 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     x:Class="client.Views.Components.Sidebar">
 
-	<Border Background="#111" Padding="20">
-		<StackPanel>
-			<TextBlock Text="My accounts 🔒" Foreground="White" FontSize="20"/>
-		</StackPanel>
-	</Border>
+    <Border Background="#111" Padding="20">
+        <StackPanel Spacing="10">
+
+            <!-- ACCOUNTS HEADER -->
+            <TextBlock Text="My accounts 🔒"
+                       Foreground="White"
+                       FontSize="20"/>
+
+            <!-- ACCOUNTS LIST -->
+            <ListBox ItemsSource="{Binding Accounts}"
+                     SelectedItem="{Binding SelectedAccount}">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Username}"
+                                   Foreground="White"
+                                   Margin="0,3"/>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <TextBlock Text="+ Add account"
+                       Foreground="Gray"
+                       Margin="0,5"/>
+
+            <Separator/>
+
+            <!-- SEARCH -->
+            <TextBox Watermark="Search" Margin="0,5"/>
+
+            <Separator/>
+
+            <!-- CHATS -->
+            <TextBlock Text="Chats" 
+                       Foreground="White" 
+                       FontSize="16"
+                       Margin="0,5"/>
+
+            <ListBox ItemsSource="{Binding Chats}"
+                     SelectedItem="{Binding SelectedChat}">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Title}"
+                                   Foreground="White"
+                                   Margin="0,4"/>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+        </StackPanel>
+    </Border>
 
 </UserControl>

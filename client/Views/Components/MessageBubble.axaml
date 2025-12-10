@@ -1,25 +1,32 @@
-<UserControl
+<UserControl 
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:converters="clr-namespace:client.Converters"
     x:Class="client.Views.Components.MessageBubble">
 
-	<Border
+    <Border
         Background="{Binding BubbleColor}"
         CornerRadius="14"
         Padding="14"
         HorizontalAlignment="{Binding IsIncoming, Converter={StaticResource BoolToAlignmentConverter}}">
 
-		<StackPanel>
-			<TextBlock Text="{Binding MessageText}"
+        <Border.ContextMenu>
+            <ContextMenu>
+                <MenuItem Header="Edit"   Click="OnEditClick"   />
+                <MenuItem Header="Delete" Click="OnDeleteClick" />
+            </ContextMenu>
+        </Border.ContextMenu>
+
+        <StackPanel>
+            <TextBlock Text="{Binding DisplayText}"
                        Foreground="White"
                        FontSize="16"/>
 
-			<TextBlock Text="{Binding Time}"
+            <TextBlock Text="{Binding Time}"
                        Foreground="#bbb"
                        HorizontalAlignment="Right"/>
-		</StackPanel>
+        </StackPanel>
 
-	</Border>
+    </Border>
 
 </UserControl>
