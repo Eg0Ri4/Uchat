@@ -36,7 +36,7 @@ namespace client.ViewModels
             {
                 if (SetProperty(ref _selectedAccount, value))
                 {
-                    // Тут можна додати логіку завантаження чатів для конкретного акаунта
+                    // Тут можна додати логіку завантаження чатів
                 }
             }
         }
@@ -93,22 +93,17 @@ namespace client.ViewModels
             _chatService.OnMessageReceived += OnMessageReceived;
 
             // Ініціалізація команд
-            
-            // --- ОСЬ ТУТ БУЛА ПОМИЛКА, ТЕПЕР ВИПРАВЛЕНО ---
-            // Використовуємо AsyncRelayCommand для асинхронного методу
             SendMessageCommand = new AsyncRelayCommand(SendCurrentMessage); 
-            // ----------------------------------------------
             
             EditLastMessageCommand = new RelayCommand(_ => EditLastMessage());
             DeleteLastMessageCommand = new RelayCommand(_ => DeleteLastMessage());
             EditMessageCommand = new RelayCommand(msg => StartEdit(msg as ChatMessage));
             DeleteMessageCommand = new RelayCommand(msg => DeleteMessage(msg as ChatMessage));
 
-            // Завантажуємо тестові чати
+            // Завантажуємо тестові чати або історію (якщо є)
             LoadFakeChats();
         }
         
-        // Конструктор для Design-Time
         public ChatPageViewModel() 
         {
             WelcomeTitle = "Design Mode";
@@ -117,16 +112,16 @@ namespace client.ViewModels
         // ----------------- ЛОГІКА ПРИЙОМУ (REALTIME) -----------------
         private void OnMessageReceived(string sender, string text)
         {
-            // SignalR викликає це з фонового потоку. Треба перемикнутися на UI потік.
+            // SignalR викликає це з фонового потоку -> перемикаємо на UI
             Dispatcher.UIThread.Invoke(() => 
             {
-                // 1. Шукаємо чат з цим відправником
+                // 1. Шукаємо чат з цим відправником (по ніку)
                 var chat = Chats.FirstOrDefault(c => c.Title == sender);
                 
                 // 2. Якщо чату немає - створюємо новий
                 if (chat == null)
                 {
-                    chat = new ChatDialog { Id = new Random().Next(100,999), Title = sender };
+                    chat = new ChatDialog { Id = new Random().Next(1, 99999), Title = sender };
                     Chats.Add(chat);
                 }
 
@@ -141,7 +136,7 @@ namespace client.ViewModels
                 // 4. Додаємо в пам'ять чату
                 chat.Messages.Add(msg);
 
-                // 5. Якщо цей чат зараз відкритий - показуємо повідомлення відразу
+                // 5. Якщо цей чат зараз відкритий - показуємо на екрані
                 if (SelectedChat == chat)
                 {
                     Messages.Add(msg);
@@ -156,13 +151,13 @@ namespace client.ViewModels
                 return;
 
             string textToSend = NewMessageText;
-            string targetNick = SelectedChat.Title; 
+            string targetNick = SelectedChat.Title; // Нік отримувача
             
-            NewMessageText = string.Empty;
+            NewMessageText = string.Empty; // Очищаємо поле
 
             try 
             {
-                // 1. Додаємо візуально собі
+                // 1. Додаємо візуально собі (як відправлене)
                 var myMessage = new ChatMessage
                 {
                     MessageText = textToSend,
@@ -172,9 +167,9 @@ namespace client.ViewModels
                 SelectedChat.Messages.Add(myMessage);
                 Messages.Add(myMessage);
 
-                // 2. ВІДПРАВЛЯЄМО НА СЕРВЕР
-                int chatId = SelectedChat.Id; 
-                await _chatService.SendMessageAsync(targetNick, textToSend, chatId);
+                // 2. ВІДПРАВЛЯЄМО ЧЕРЕЗ СЕРВІС
+                // Сервіс сам знайде ID, зашифрує і відправить
+                await _chatService.SendMessageAsync(targetNick, textToSend);
             }
             catch (Exception ex)
             {
@@ -185,9 +180,12 @@ namespace client.ViewModels
         // ----------------- ІНШІ МЕТОДИ (Load, Edit, Delete) -----------------
         private void LoadFakeChats()
         {
+            // Створюємо стартовий чат (наприклад, з EchoBot або іншим юзером)
+            // Важливо: Title має співпадати з ніком, щоб працювала відправка
             var chat1 = new ChatDialog { Id = 1, Title = "EchoBot" }; 
             chat1.Messages.Add(new ChatMessage { MessageText = "Type something...", IsIncoming = true });
             Chats.Add(chat1);
+            
             SelectedChat = chat1;
         }
 
