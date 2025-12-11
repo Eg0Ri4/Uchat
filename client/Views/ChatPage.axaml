@@ -5,65 +5,76 @@
     xmlns:vm="using:client.ViewModels"
     x:Class="client.Views.ChatPage">
 
-    <!-- ViewModel сторінки -->
-    <UserControl.DataContext>
-        <vm:ChatPageViewModel/>
-    </UserControl.DataContext>
+	<!-- ViewModel сторінки -->
+	<UserControl.DataContext>
+		<vm:ChatPageViewModel/>
+	</UserControl.DataContext>
 
-    <!-- Основна сітка: ліва панель + права область чату -->
-    <Grid ColumnDefinitions="320,*">
+	<!-- Основна сітка: ліва панель + права область чату -->
+	<Grid ColumnDefinitions="320,*">
 
-        <!-- Ліва панель: акаунти + чати -->
-        <local:Sidebar Grid.Column="0"/>
+		<!-- Ліва панель: акаунти + чати -->
+		<local:Sidebar Grid.Column="0"/>
 
-        <!-- Права частина: топбар, повідомлення, поле вводу -->
-        <Grid Grid.Column="1" RowDefinitions="60,*,Auto">
+		<!-- Права частина: топбар, повідомлення, поле вводу, фон з картинкою -->
+		<Border Grid.Column="1">
+			<Border.Background>
+				<ImageBrush Source="/Assets/chat-bg-red.png"
+                            Stretch="UniformToFill"
+                            AlignmentX="Center"
+                            AlignmentY="Center"
+                            Opacity="0.9" />
+			</Border.Background>
 
-            <!-- Верхня панель (Username, статус) -->
-            <local:TopBar Grid.Row="0"/>
+			<Grid RowDefinitions="60,*,Auto">
 
-            <!-- Список повідомлень -->
-            <ScrollViewer Grid.Row="1"
-                          VerticalScrollBarVisibility="Auto">
-                <ItemsControl ItemsSource="{Binding Messages}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <local:MessageBubble/>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
+				<!-- Верхня панель (Username, статус) -->
+				<local:TopBar Grid.Row="0"/>
 
-            <!-- Поле вводу + кнопки -->
-            <Grid Grid.Row="2" Margin="10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+				<!-- Список повідомлень -->
+				<ScrollViewer Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto">
+					<ItemsControl ItemsSource="{Binding Messages}">
+						<ItemsControl.ItemTemplate>
+							<DataTemplate>
+								<local:MessageBubble/>
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+					</ItemsControl>
+				</ScrollViewer>
 
-                <TextBox Grid.Column="0"
-                         Text="{Binding NewMessageText, UpdateSourceTrigger=PropertyChanged}"
-						 KeyDown="OnMessageBoxKeyDown"
-                         Watermark="Write a message..."
-                         Margin="0,0,10,0"/>
+				<!-- Поле вводу + кнопки -->
+				<Grid Grid.Row="2" Margin="10">
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="*"/>
+						<ColumnDefinition Width="Auto"/>
+						<ColumnDefinition Width="Auto"/>
+						<ColumnDefinition Width="Auto"/>
+					</Grid.ColumnDefinitions>
 
-                <Button Grid.Column="1"
-                        Content="Send"
-                        Command="{Binding SendMessageCommand}"
-                        Margin="0,0,5,0"/>
+					<TextBox Grid.Column="0"
+                             Text="{Binding NewMessageText, UpdateSourceTrigger=PropertyChanged}"
+                             KeyDown="OnMessageBoxKeyDown"
+                             Watermark="Write a message..."
+                             Margin="0,0,10,0"/>
 
-                <Button Grid.Column="2"
-                        Content="Edit last"
-                        Command="{Binding EditLastMessageCommand}"
-                        Margin="0,0,5,0"/>
+					<Button Grid.Column="1"
+                            Content="Send"
+                            Command="{Binding SendMessageCommand}"
+                            Margin="0,0,5,0"/>
 
-                <Button Grid.Column="3"
-                        Content="Delete last"
-                        Command="{Binding DeleteLastMessageCommand}"/>
-            </Grid>
+					<Button Grid.Column="2"
+                            Content="Edit last"
+                            Command="{Binding EditLastMessageCommand}"
+                            Margin="0,0,5,0"/>
 
-        </Grid>
-    </Grid>
+					<Button Grid.Column="3"
+                            Content="Delete last"
+                            Command="{Binding DeleteLastMessageCommand}"/>
+				</Grid>
+
+			</Grid>
+		</Border>
+
+	</Grid>
 </UserControl>

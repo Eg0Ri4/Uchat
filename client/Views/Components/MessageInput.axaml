@@ -1,27 +1,44 @@
 ﻿<UserControl
+    x:Class="client.Views.Components.MessageInput"
     xmlns="https://github.com/avaloniaui"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    x:Class="client.Views.Components.MessageInput">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-	<Border Background="#111" Padding="10">
-		<Grid ColumnDefinitions="*,Auto">
+	<!-- Нижня панель вводу -->
+	<Border
+        Background="#F01D1A1A"
+	
+		Padding="16,12">
 
-			<!-- Text Field -->
+		<Grid ColumnDefinitions="*,Auto"
+              VerticalAlignment="Center">
+
+		
 			<TextBox x:Name="InputBox"
                      Watermark="Write a message..."
-                     Background="#222"
-                     Foreground="White"
-                     BorderBrush="#444"
-                     CornerRadius="10"
-                     Padding="10"/>
+                     Background="#141111"    
+			Foreground="White"
+			BorderBrush="Transparent"
+			BorderThickness="0"     
+			CornerRadius="24"
+			Padding="16,0"
+			Height="44"
+			FontSize="14"
+			VerticalContentAlignment="Center" />
 
-			<!-- Send Button -->
+			<!-- Кнопка відправки (кругла з “стрілкою”) -->
 			<Button Grid.Column="1"
-                    Background="#660066"
-                    Foreground="White"
-                    Padding="12"
-                    Margin="10,0,0,0">
-				Send
+                    Width="44"
+                    Height="44"
+                    Margin="12,0,0,0"
+                    Background="#5B2727"
+                    BorderBrush="#000000"
+                    BorderThickness="1"
+                    CornerRadius="22"
+                    Foreground="White">
+				<TextBlock Text="➤"
+                           FontSize="18"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center" />
 			</Button>
 
 		</Grid>
