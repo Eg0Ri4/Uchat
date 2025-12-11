@@ -3,15 +3,21 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows.Input;
 using client.Models;
+using CommunityToolkit.Mvvm.Input; // Переконайся, що цей using є, якщо ні - додай
 
 namespace client.ViewModels
 {
     public class ChatPageViewModel : ViewModelBase
     {
-        // ----------------- ACCOUNTS -----------------
-        public ICommand EditMessageCommand { get; }
-public ICommand DeleteMessageCommand { get; }
+        // ----------------- NEW: TITLE (ПРИВІТАННЯ) -----------------
+        private string _welcomeTitle = "Chat";
+        public string WelcomeTitle
+        {
+            get => _welcomeTitle;
+            set => SetProperty(ref _welcomeTitle, value);
+        }
 
+        // ----------------- ACCOUNTS -----------------
         public ObservableCollection<AccountInfo> Accounts { get; } = new();
 
         private AccountInfo? _selectedAccount;
@@ -20,11 +26,10 @@ public ICommand DeleteMessageCommand { get; }
             get => _selectedAccount;
             set
             {
-                if (_selectedAccount == value)
-                    return;
-
+                if (_selectedAccount == value) return;
                 _selectedAccount = value;
                 LoadChatsForAccount(_selectedAccount);
+                OnPropertyChanged(nameof(SelectedAccount)); // На всяк випадок
             }
         }
 
@@ -37,17 +42,16 @@ public ICommand DeleteMessageCommand { get; }
             get => _selectedChat;
             set
             {
-                if (_selectedChat == value)
-                    return;
-
+                if (_selectedChat == value) return;
                 _selectedChat = value;
-
+                
                 Messages.Clear();
                 if (_selectedChat != null)
                 {
                     foreach (var msg in _selectedChat.Messages)
                         Messages.Add(msg);
                 }
+                OnPropertyChanged(nameof(SelectedChat));
             }
         }
 
@@ -72,7 +76,13 @@ public ICommand DeleteMessageCommand { get; }
         public ICommand SendMessageCommand { get; }
         public ICommand EditLastMessageCommand { get; }
         public ICommand DeleteLastMessageCommand { get; }
+        public ICommand EditMessageCommand { get; }
+        public ICommand DeleteMessageCommand { get; }
 
+
+        // ----------------- CONSTRUCTORS (ОСЬ ТУТ БУЛА ПОМИЛКА) -----------------
+
+        // 1. Головний конструктор (ініціалізує дані)
         public ChatPageViewModel()
         {
             // Тестові акаунти
@@ -84,9 +94,27 @@ public ICommand DeleteMessageCommand { get; }
             // Команди
             SendMessageCommand       = new RelayCommand(_ => SendCurrentMessage());
             EditLastMessageCommand   = new RelayCommand(_ => EditLastMessage());
-            DeleteLastMessageCommand = new RelayCommand(_ => DeleteLastMessage());EditMessageCommand   = new RelayCommand(msg => StartEdit(msg as ChatMessage));
-            DeleteMessageCommand = new RelayCommand(msg => DeleteMessage(msg as ChatMessage));
+            DeleteLastMessageCommand = new RelayCommand(_ => DeleteLastMessage());
+            
+            // Тут я роз'єднав рядки, які злиплися
+            EditMessageCommand       = new RelayCommand(msg => StartEdit(msg as ChatMessage));
+            DeleteMessageCommand     = new RelayCommand(msg => DeleteMessage(msg as ChatMessage));
+            
+            WelcomeTitle = "Preview Mode";
+        }
 
+        // 2. ДОДАНИЙ КОНСТРУКТОР: Приймає ім'я (виправляє CS1729)
+        // : this() означає "спочатку виконай код з конструктора вище, потім цей"
+        public ChatPageViewModel(string username) : this()
+        {
+            if (!string.IsNullOrEmpty(username))
+            {
+                WelcomeTitle = $"Привіт, {username}!";
+            }
+            else
+            {
+                WelcomeTitle = "Привіт, Користувач!";
+            }
         }
 
         // ----------------- LOADING CHATS -----------------
@@ -95,8 +123,7 @@ public ICommand DeleteMessageCommand { get; }
             Chats.Clear();
             Messages.Clear();
 
-            if (account == null)
-                return;
+            if (account == null) return;
 
             // Чат 1
             var chat1 = new ChatDialog { Id = 1, Title = "@snake126" };
@@ -124,13 +151,13 @@ public ICommand DeleteMessageCommand { get; }
             SelectedChat = chat1;
         }
 
-        // ----------------- SEND / EDIT / DELETE -----------------
+        // ----------------- ACTIONS -----------------
         private void SendCurrentMessage()
         {
             if (string.IsNullOrWhiteSpace(NewMessageText) || SelectedChat == null)
                 return;
 
-            // Редагування існуючого повідомлення
+            // Редагування
             if (EditingMessage != null)
             {
                 EditingMessage.MessageText = NewMessageText;
@@ -152,7 +179,7 @@ public ICommand DeleteMessageCommand { get; }
             SelectedChat.Messages.Add(myMessage);
             Messages.Add(myMessage);
 
-            // Авто-відповідь для демонстрації
+            // Авто-відповідь
             var reply = new ChatMessage
             {
                 MessageText = "Auto-reply: got it ✅",
@@ -168,8 +195,7 @@ public ICommand DeleteMessageCommand { get; }
         private void EditLastMessage()
         {
             var msg = Messages.LastOrDefault(m => !m.IsIncoming && !m.IsDeleted);
-            if (msg == null)
-                return;
+            if (msg == null) return;
 
             EditingMessage = msg;
             NewMessageText = msg.MessageText;
@@ -178,20 +204,16 @@ public ICommand DeleteMessageCommand { get; }
         private void DeleteLastMessage()
         {
             var msg = Messages.LastOrDefault(m => !m.IsIncoming && !m.IsDeleted);
-            if (msg == null)
-                return;
+            if (msg == null) return;
 
             msg.IsDeleted   = true;
             msg.MessageText = string.Empty;
         }
-                public void StartEdit(ChatMessage? message)
-                {
-            if (message == null)
-                return;
 
-            // редагуємо тільки свої повідомлення
-            if (message.IsIncoming)
-                return;
+        public void StartEdit(ChatMessage? message)
+        {
+            if (message == null) return;
+            if (message.IsIncoming) return;
 
             EditingMessage = message;
             NewMessageText = message.MessageText;
@@ -199,15 +221,11 @@ public ICommand DeleteMessageCommand { get; }
 
         public void DeleteMessage(ChatMessage? message)
         {
-            if (message == null)
-                return;
-
-            if (message.IsIncoming)
-                return;
+            if (message == null) return;
+            if (message.IsIncoming) return;
 
             message.IsDeleted   = true;
             message.MessageText = string.Empty;
-            }
-
+        }
     }
 }

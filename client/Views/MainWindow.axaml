@@ -3,19 +3,25 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:views="using:client.Views"
+        xmlns:vm="using:client.ViewModels"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
         x:Class="client.Views.MainWindow"
         Icon="/Assets/avalonia-logo.ico"
         Title="Uchat"
         TransparencyLevelHint="AcrylicBlur"
-        Background="Black"  ExtendClientAreaToDecorationsHint="True">
+        Background="Black"
+        ExtendClientAreaToDecorationsHint="True">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
     <Grid>
-    
         <Image Source="/Assets/Images/background.png" 
                Stretch="UniformToFill" 
                Opacity="0.3"/>
 
-		<views:ChatPage /> 
+        <ContentControl Content="{Binding CurrentPage}" />
     
     </Grid>
 </Window>

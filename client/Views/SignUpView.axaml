@@ -9,7 +9,6 @@
   mc:Ignorable="d">
 
   <UserControl.Styles>
-
     <Style Selector="TextBox">
       <Setter Property="Background" Value="#2B2B2B" />
       <Setter Property="Foreground" Value="White" />
@@ -26,13 +25,12 @@
     <Style Selector="TextBox:focus">
       <Setter Property="Background" Value="#3A3A3A" />
       <Setter Property="BorderThickness" Value="2" />
-      <Setter Property="BorderBrush" Value="#00FFFF" /> 
+      <Setter Property="BorderBrush" Value="#00FFFF" />
     </Style>
 
     <Style Selector="TextBox /template/ Button#RevealButton /template/ Path">
       <Setter Property="Fill" Value="White" />
     </Style>
-
 
     <Style Selector="CheckBox /template/ ContentPresenter">
       <Setter Property="Foreground" Value="#888888" />
@@ -43,7 +41,6 @@
     <Style Selector="CheckBox:pressed /template/ ContentPresenter">
       <Setter Property="Foreground" Value="#888888" />
     </Style>
-
   </UserControl.Styles>
 
   <Grid>
@@ -101,13 +98,12 @@
         <TextBlock
           FontSize="12"
           Foreground="#AAAAAA"
-          Text="Username *"
-           />
+          Text="Username *" />
         <TextBox
           Height="40"
           CornerRadius="8"
-          Watermark="Username"
-           />
+          Text="{Binding RegUsernameInput}"
+          Watermark="Username" />
 
         <TextBlock
           FontSize="12"
@@ -116,6 +112,7 @@
         <TextBox
           Height="40"
           CornerRadius="8"
+          Text="{Binding RegEmailInput}"
           Watermark="Email" />
 
         <TextBlock
@@ -127,6 +124,7 @@
           CornerRadius="8"
           PasswordChar="•"
           RevealPassword="True"
+          Text="{Binding RegPasswordInput}"
           Watermark="Password" />
 
         <StackPanel Margin="0,-5,0,5" Orientation="Horizontal">
@@ -151,6 +149,7 @@
           HorizontalContentAlignment="Center"
           VerticalContentAlignment="Center"
           Background="White"
+          Click="OnRegisterClick"
           Content="Sign up"
           CornerRadius="25"
           FontWeight="Bold"
@@ -165,6 +164,7 @@
             Padding="5,0,0,0"
             Background="Transparent"
             BorderThickness="0"
+            Click="OnBackToLoginClick"
             Content="Sign in"
             FontWeight="Bold"
             Foreground="White" />
