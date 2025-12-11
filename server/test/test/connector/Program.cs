@@ -65,7 +65,7 @@ connection.On<string, string, string, string>("ReceiveSecureMessage", (sender, c
         }
         else
         {
-            string myPrivKey = File.ReadAllText("private.key");
+            string myPrivKey = File.ReadAllText($"{ActiveMail}.key");
 
             // 1. Decrypt the shared Session Key using our Private Key (RSA)
             byte[] sessionKey = CryptographyService.DecryptSessionKey(myEncryptedKey, myPrivKey);
@@ -210,7 +210,7 @@ while (true)
              {
                  try {
                      if(File.Exists("private.key")) {
-                        string myPriv = File.ReadAllText("private.key");
+                        string myPriv = File.ReadAllText("{}.key");
                         // Decrypt Key -> Decrypt Message
                         var sessKey = CryptographyService.DecryptSessionKey(item.MyEncryptedKey, myPriv);
                         var txt = CryptographyService.DecryptMessage(item.CipherText, item.IV, sessKey);

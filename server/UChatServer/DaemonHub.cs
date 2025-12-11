@@ -267,6 +267,12 @@ public async Task InitPrivateChat(string targetNick, int myId)
         await Clients.Group(targetNick).SendAsync("ChatCreated", chatId, "Someone"); 
     }
 
+    public async Task InitiatagroupChat(string name, int myId)
+    {
+        string cs = _config.GetConnectionString("DefaultConnection");
+        
+    }
+
     // --- MESSAGING ---
 
     public async Task<string> GetPublicKey(string username)
