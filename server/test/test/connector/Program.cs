@@ -7,6 +7,7 @@ string serverIp = "localhost";
 int serverPort = 5000;
 if (args.Length > 0) serverIp = args[0];
 if (args.Length > 1 && int.TryParse(args[1], out int p)) serverPort = p;
+string ActiveMail = "example@mail.com";
 
 string hubUrl = $"http://{serverIp}:{serverPort}/hubs/daemon";
 Console.WriteLine($"Target Server: {hubUrl}");
@@ -30,14 +31,14 @@ connection.On<string, string, string, string>("ReceiveSecureMessage", (sender, c
 {
     try 
     {
-        if (!File.Exists("private.key")) 
+        if (!File.Exists($"{ActiveMail}.key")) 
         {
             Console.WriteLine($"\r[{sender}]: [LOCKED - No Private Key Found]");
             Console.Write("You: ");
             return;
         }
 
-        string myPrivKey = File.ReadAllText("private.key");
+        string myPrivKey = File.ReadAllText($"{ActiveMail}.key");
 
         // 1. Unlock the Session Key (RSA)
         byte[] sessionKey = CryptographyService.DecryptSessionKey(myEncryptedKey, myPrivKey);
@@ -58,8 +59,8 @@ connection.On<string, string, string, string>("ReceiveSecureMessage", (sender, c
 connection.On<string>("ReceivePrivateKey", (key) =>
 {
     Console.WriteLine($"\n[System] REGISTRATION SUCCESS!");
-    File.WriteAllText("private.key", key);
-    Console.WriteLine($"[System] Private Key saved to 'private.key'");
+    File.WriteAllText($"{ActiveMail}.key", key);
+    Console.WriteLine($"[System] Private Key saved to '{ActiveMail}.key'");
     Console.Write("You: ");
 });
 
@@ -91,6 +92,7 @@ while (true)
         if (parts.Length < 4) { Console.WriteLine("Usage: /register email pass nick"); continue; }
         await connection.InvokeAsync("Register", parts[3], parts[1], parts[2]); // nick, mail, pass
         currentUser = parts[3];
+        ActiveMail = parts[1];
     }
     // --- LOGIN ---
     else if (input.StartsWith("/login"))
@@ -98,6 +100,7 @@ while (true)
         var parts = input.Split(' ');
         if (parts.Length < 3) { Console.WriteLine("Usage: /login email pass"); continue; }
         await connection.InvokeAsync("LogIn", parts[1], parts[2]);
+        ActiveMail = parts[1];
         
         // Optional: Fetch History here
     }
