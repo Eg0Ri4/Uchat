@@ -80,7 +80,10 @@ namespace client.Models
             }
         }
 
-        public string BubbleColor => IsIncoming ? "#333" : "#660066";
+        public string BubbleColor => IsIncoming
+    ? "#B2222222"  // темний сірий з прозорістю ~0.7
+    : "#B25E2C2C"; // бордовий з прозорістю ~0.7
+
 
         public string DisplayText =>
             IsDeleted ? "Message deleted" :
