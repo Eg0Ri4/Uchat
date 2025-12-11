@@ -9,10 +9,12 @@ using connector;
 // --- 1. CONFIGURATION ---
 string serverIp = "localhost";
 int serverPort = 5000;
+if (args.Length > 0) serverIp = args[0];
+if (args.Length > 1 && int.TryParse(args[1], out int p)) serverPort = p;
 string hubUrl = $"http://{serverIp}:{serverPort}/hubs/daemon";
 
 // --- 2. CLIENT STATE ---
-long myId = -1; // Changed to long
+long myId = -1; 
 string myNick = "Guest";
 string ActiveMail = "guest@mail.com";
 Dictionary<string, long> activeChats = new Dictionary<string, long>(); // Map Nick -> ChatID
@@ -37,7 +39,6 @@ connection.On<long, string>("LoginSuccess", (id, nick) =>
 // B. Group Init
 connection.On<long, string, List<string>>("ReceiveGroupInit", (chatId, groupName, participants) =>
 {
-    // We treat the group name as a "User" for the activeChats dictionary for simplicity
     activeChats[groupName] = chatId;
     Console.WriteLine($"\n[System] Group '{groupName}' (ID: {chatId}) created.");
     Console.WriteLine($"[System] Members: {string.Join(", ", participants)}");
@@ -109,6 +110,7 @@ Console.WriteLine("/search [query]");
 Console.WriteLine("/chat [target]                -> Init Private Chat");
 Console.WriteLine("/create [Group] [User1] ...   -> Create Group");
 Console.WriteLine("/msg [target/Group] [text]    -> Send Message (Private or Group Name)");
+Console.WriteLine("/history [target]             -> Read past messages");
 Console.WriteLine("----------------\n");
 
 while (true)
@@ -141,11 +143,11 @@ while (true)
         {
             if (myId == -1) { Console.WriteLine("Login first."); continue; }
             if (parts.Length < 2) Console.WriteLine("Usage: /chat target");
-            else await connection.InvokeAsync("InitPrivateChat", parts[1], (int)myId); // Cast to int if server expects int, or update server to long
+            else await connection.InvokeAsync("InitPrivateChat", parts[1], (int)myId); 
         }
         else if (cmd == "/create")
         {
-            // /create MyGroup Bob Alice
+            // Usage: /create MyGroup Bob Alice
             if (myId == -1) { Console.WriteLine("Login first."); continue; }
             if (parts.Length < 3) { Console.WriteLine("Usage: /create Name User1 User2..."); continue; }
             
@@ -153,7 +155,8 @@ while (true)
             var participants = parts.Skip(2).ToList();
             if(!participants.Contains(myNick)) participants.Add(myNick);
 
-            await connection.InvokeAsync("CreateGroup", groupName, participants);
+            // FIX: Pass myNick as the creator so server marks you as Owner
+            await connection.InvokeAsync("CreateGroup", groupName, myNick, participants);
         }
         else if (cmd == "/msg")
         { 
@@ -163,7 +166,6 @@ while (true)
             string target = parts[1];
             string messageText = string.Join(" ", parts.Skip(2));
 
-            // Check if we have an active chat ID for this target (Group Name or User Nick)
             if (!activeChats.ContainsKey(target))
             {
                 Console.WriteLine($"[Error] No active chat ID found for '{target}'.");
@@ -174,10 +176,7 @@ while (true)
             long chatId = activeChats[target];
             List<string> participants;
 
-            // Determine participants
-            // 1. If it's a private chat, we need to manually reconstruct the list: Me + Target
-            // 2. If it's a group, we need to ask the server who is in it.
-            // Simplified approach: Ask server for participants of this ChatID
+            // Simplified: Ask server for participants of this ChatID
             participants = await connection.InvokeAsync<List<string>>("GetChatParticipants", chatId);
 
             // Encryption Sequence
@@ -194,7 +193,8 @@ while (true)
             // Send
             await connection.InvokeAsync("SendSecureMessage", chatId, myId, myNick, encryptedBody.CipherText, encryptedBody.IV, keyBundle);
             Console.WriteLine($"[System] Sent.");
-        }else if (cmd == "/history")
+        }
+        else if (cmd == "/history")
         {
             if (myId == -1) { Console.WriteLine("Login first."); continue; }
             if (parts.Length < 2) { Console.WriteLine("Usage: /history target_nick_or_group"); continue; }
@@ -243,81 +243,12 @@ while (true)
             {
                 Console.WriteLine($"[Error fetching history] {ex.Message}");
             }
-        }else if (cmd == "/history")
-        {
-            if (myId == -1) { Console.WriteLine("Login first."); continue; }
-            if (parts.Length < 2) { Console.WriteLine("Usage: /history target_nick_or_group"); continue; }
-            
-            string target = parts[1];
-            
-            if (!activeChats.ContainsKey(target)) 
-            { 
-                Console.WriteLine($"Chat with '{target}' is not active locally."); 
-                Console.WriteLine("Try /chat or /create first to sync the ID.");
-                continue; 
-            }
-
-            long chatId = activeChats[target];
-            
-            try 
-            {
-                // Call server to get history items
-                var history = await connection.InvokeAsync<List<HistoryItem>>("GetChatHistory", chatId, myId);
-
-                Console.WriteLine($"\n--- History for {target} (Chat {chatId}) ---");
-                
-                string myPrivKey = "";
-                if (File.Exists($"{ActiveMail}.key")) myPrivKey = File.ReadAllText($"{ActiveMail}.key");
-
-                foreach(var item in history)
-                {
-                    string displayMsg = "[LOCKED]";
-                    if (!string.IsNullOrEmpty(myPrivKey))
-                    {
-                        try 
-                        {
-                            var sessKey = CryptographyService.DecryptSessionKey(item.MyEncryptedKey, myPrivKey);
-                            displayMsg = CryptographyService.DecryptMessage(item.CipherText, item.IV, sessKey);
-                        }
-                        catch 
-                        {
-                            displayMsg = "[Decryption Error]";
-                        }
-                    }
-                    Console.WriteLine($"[{item.Timestamp.ToShortTimeString()}] {item.Sender}: {displayMsg}");
-                }
-                Console.WriteLine("--------------------------------------------");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[Error fetching history] {ex.Message}");
-            }
-             Console.WriteLine($"\n--- History with {targetNick} ---");
-             foreach(var item in history)
-             {
-                 try {
-                     if(File.Exists($"{ActiveMail}.key")) {
-                        string myPriv = File.ReadAllText($"{ActiveMail}.key");
-                        // Decrypt Key -> Decrypt Message
-                        var sessKey = CryptographyService.DecryptSessionKey(item.MyEncryptedKey, myPriv);
-                        var txt = CryptographyService.DecryptMessage(item.CipherText, item.IV, sessKey);
-                        
-                        Console.WriteLine($"[{item.Timestamp.ToShortTimeString()}] {item.Sender}: {txt}");
-                     } else {
-                        Console.WriteLine($"[{item.Timestamp.ToShortTimeString()}] {item.Sender}: [LOCKED]");
-                     }
-                 } catch {
-                     Console.WriteLine($"[{item.Timestamp.ToShortTimeString()}] {item.Sender}: [Decryption Error]");
-                 }
-             }
-             Console.WriteLine("-------------------------------");
         }
     }
     catch (Exception ex)
     {
         Console.WriteLine($"[Error] {ex.Message}");
     }
-    
 }
 
 async Task ConnectWithRetryAsync(HubConnection connection)
@@ -337,6 +268,7 @@ async Task ConnectWithRetryAsync(HubConnection connection)
         }
     }
 }
+
 public class HistoryItem
 {
     public long MessageId { get; set; }
@@ -346,6 +278,7 @@ public class HistoryItem
     public string MyEncryptedKey { get; set; }
     public DateTime Timestamp { get; set; }
 }
+
 public class InfiniteRetryPolicy : IRetryPolicy
 {
     public TimeSpan? NextRetryDelay(RetryContext retryContext) => TimeSpan.FromSeconds(5);
