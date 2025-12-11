@@ -6,7 +6,7 @@ using Microsoft.Extensions.Configuration;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System;
-using System.Linq; // Added for List manipulation
+using System.Linq; 
 
 public class DaemonHub : Hub
 {
@@ -136,7 +136,39 @@ public class DaemonHub : Hub
             }
         }
     }
+    
+// Returns a list containing the Chat ID (int) and Chat Type (string)
+    public async Task<List<(int Id, string Type)>> GetChats(string username)
+    {
+        var chats = new List<(int Id, string Type)>();
+        string cs = _config.GetConnectionString("DefaultConnection");
 
+        using (var conn = new MySqlConnection(cs))
+        {
+            await conn.OpenAsync();
+            string sql = @"
+        SELECT c.id, c.type 
+        FROM user u
+        JOIN chat_member cm ON u.id = cm.usr_id
+        JOIN chats c ON cm.chat_id = c.id
+        WHERE u.nickname = @username";
+
+            using (var cmd = new MySqlCommand(sql, conn))
+            {
+                cmd.Parameters.AddWithValue("@username", username);
+                using (var reader = await cmd.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        // FIXED LINE BELOW:
+                        chats.Add((Convert.ToInt32(reader["id"]), reader["type"].ToString()));
+                    }
+                }
+            }
+        }
+        return chats;
+    }
+    
     // --- HELPERS (ADDED FOR GROUPS) ---
 
     // 1. Get Participants in a Chat (Used for Groups)
