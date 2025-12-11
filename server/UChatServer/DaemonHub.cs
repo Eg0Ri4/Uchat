@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System;
+using System.Linq; // Added for List manipulation
 
 public class DaemonHub : Hub
 {
@@ -19,14 +20,12 @@ public class DaemonHub : Hub
     // --- CONNECTION SETUP ---
     public override async Task OnConnectedAsync()
     {
-        // Send the Process ID so the client knows which server instance they hit
         string pid = Environment.ProcessId.ToString();
         await Clients.Caller.SendAsync("ReceiveServerId", pid);
         await base.OnConnectedAsync();
     }
 
     // --- AUTHENTICATION ---
-    
     public async Task LogIn(string mail, string password)
     {
         string cs = _config.GetConnectionString("DefaultConnection");
@@ -40,7 +39,6 @@ public class DaemonHub : Hub
         {
             await conn.OpenAsync();
 
-            // 1. Fetch User Data
             string readSql = "SELECT id, nickname, paswd, salt FROM user WHERE mail = @mail";
             using (var cmd = new MySqlCommand(readSql, conn))
             {
@@ -49,7 +47,6 @@ public class DaemonHub : Hub
                 {
                     if (await reader.ReadAsync())
                     {
-                        // FIX: Use GetOrdinal to get the index first
                         db_id = reader.GetInt64(reader.GetOrdinal("id"));
                         db_nickname = reader.GetString(reader.GetOrdinal("nickname"));
                         db_hash = reader.GetString(reader.GetOrdinal("paswd"));
@@ -64,18 +61,15 @@ public class DaemonHub : Hub
             }
         }
 
-        // 2. Verify Password
         var service = new PasswordService();
         bool isMatch = service.VerifyPassword(password, db_hash, db_salt);
 
         if (isMatch)
         {
-            // 3. "Create Socket" for User
-            // We tag this connection ID with the user's nickname. 
-            // This allows us to target them specifically later using Clients.Group(nickname).
+            // CRITICAL: This is what was missing in the broken version.
+            // We map the ConnectionID to the Nickname so Clients.Group(nick) works.
             await Groups.AddToGroupAsync(Context.ConnectionId, db_nickname);
 
-            // 4. Send the ID back to the client
             await Clients.Caller.SendAsync("LoginSuccess", db_id, db_nickname);
             Console.WriteLine($"[System] User {db_nickname} (ID: {db_id}) logged in.");
         }
@@ -143,6 +137,74 @@ public class DaemonHub : Hub
         }
     }
 
+    // --- HELPERS (ADDED FOR GROUPS) ---
+
+    // 1. Get Participants in a Chat (Used for Groups)
+    public async Task<List<string>> GetChatParticipants(long chatId)
+    {
+        var participants = new List<string>();
+        string cs = _config.GetConnectionString("DefaultConnection");
+
+        using (var conn = new MySqlConnection(cs))
+        {
+            await conn.OpenAsync();
+            string sql = @"
+                SELECT u.nickname 
+                FROM chat_member cm
+                JOIN user u ON cm.usr_id = u.id
+                WHERE cm.chat_id = @cid";
+
+            using (var cmd = new MySqlCommand(sql, conn))
+            {
+                cmd.Parameters.AddWithValue("@cid", chatId);
+                using (var reader = await cmd.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        participants.Add(reader.GetString(0));
+                    }
+                }
+            }
+        }
+        return participants;
+    }
+
+    // 2. Batch Public Keys (For Group Encryption)
+    public async Task<Dictionary<string, string>> GetPublicKeys(List<string> usernames)
+    {
+        var keys = new Dictionary<string, string>();
+        if (usernames == null || !usernames.Any()) return keys;
+
+        string cs = _config.GetConnectionString("DefaultConnection");
+        var parms = usernames.Select((s, i) => $"@u{i}").ToArray();
+        string inClause = string.Join(",", parms);
+
+        using (var conn = new MySqlConnection(cs))
+        {
+            await conn.OpenAsync();
+            string sql = $"SELECT nickname, public_key FROM user WHERE nickname IN ({inClause})";
+
+            using (var cmd = new MySqlCommand(sql, conn))
+            {
+                for (int i = 0; i < usernames.Count; i++)
+                {
+                    cmd.Parameters.AddWithValue($"@u{i}", usernames[i]);
+                }
+
+                using (var reader = await cmd.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        int nickIdx = reader.GetOrdinal("nickname");
+                        int keyIdx = reader.GetOrdinal("public_key");
+                        keys[reader.GetString(nickIdx)] = reader.GetString(keyIdx);
+                    }
+                }
+            }
+        }
+        return keys;
+    }
+
     // --- SEARCH & CHAT CREATION ---
 
     public async Task SearchUsers(string query)
@@ -169,7 +231,70 @@ public class DaemonHub : Hub
         await Clients.Caller.SendAsync("ReceiveSearchResults", results);
     }
 
-public async Task InitPrivateChat(string targetNick, int myId)
+    // Added: CREATE GROUP
+    public async Task CreateGroup(string groupName, List<string> participants)
+    {
+        string cs = _config.GetConnectionString("DefaultConnection");
+        long newChatId = 0;
+
+        using (var conn = new MySqlConnection(cs))
+        {
+            await conn.OpenAsync();
+            using (var trans = await conn.BeginTransactionAsync())
+            {
+                try
+                {
+                    // 1. Create Chat
+                    string createChatSql = "INSERT INTO chats(type) VALUES('group'); SELECT LAST_INSERT_ID();";
+                    using (var cmdChat = new MySqlCommand(createChatSql, conn, trans))
+                    {
+                        newChatId = Convert.ToInt64(await cmdChat.ExecuteScalarAsync());
+                    }
+
+                    // 2. Add Members
+                    string getUserIdSql = "SELECT id FROM user WHERE nickname = @nick";
+                    string addMemberSql = "INSERT INTO chat_member(usr_id, chat_id, status) VALUES(@uid, @cid, @stat)";
+
+                    foreach (var nickname in participants)
+                    {
+                        long userId = -1;
+                        using (var cmdGetId = new MySqlCommand(getUserIdSql, conn, trans))
+                        {
+                            cmdGetId.Parameters.AddWithValue("@nick", nickname);
+                            var result = await cmdGetId.ExecuteScalarAsync();
+                            if (result != null) userId = Convert.ToInt64(result);
+                        }
+
+                        if (userId != -1)
+                        {
+                            using (var cmdAdd = new MySqlCommand(addMemberSql, conn, trans))
+                            {
+                                cmdAdd.Parameters.AddWithValue("@uid", userId);
+                                cmdAdd.Parameters.AddWithValue("@cid", newChatId);
+                                cmdAdd.Parameters.AddWithValue("@stat", "member");
+                                await cmdAdd.ExecuteNonQueryAsync();
+                            }
+                        }
+                    }
+
+                    await trans.CommitAsync();
+                }
+                catch
+                {
+                    await trans.RollbackAsync();
+                    throw;
+                }
+            }
+        }
+
+        // 3. Notify Participants (Using Groups pattern from LogIn)
+        foreach (var user in participants)
+        {
+            await Clients.Group(user).SendAsync("ReceiveGroupInit", newChatId, groupName, participants);
+        }
+    }
+
+    public async Task InitPrivateChat(string targetNick, int myId)
     {
         string cs = _config.GetConnectionString("DefaultConnection");
         long targetId = -1;
@@ -179,7 +304,6 @@ public async Task InitPrivateChat(string targetNick, int myId)
         {
             await conn.OpenAsync();
 
-            // 1. Get Target ID
             string idSql = "SELECT id FROM user WHERE nickname = @nic";
             using(var cmd = new MySqlCommand(idSql, conn))
             {
@@ -193,8 +317,6 @@ public async Task InitPrivateChat(string targetNick, int myId)
                 targetId = Convert.ToInt64(res);
             }
 
-            // --- NEW: 2. Check if chat already exists ---
-            // We look for a chat of type 'private' that contains BOTH myId and targetId
             string checkSql = @"
                 SELECT c.id 
                 FROM chats c
@@ -213,17 +335,12 @@ public async Task InitPrivateChat(string targetNick, int myId)
 
                 if (existingChatId != null)
                 {
-                    // Chat found! Use existing ID.
                     chatId = Convert.ToInt64(existingChatId);
-                    
-                    // Notify just the caller that the chat is ready (re-using old ID)
                     await Clients.Caller.SendAsync("ChatCreated", chatId, targetNick);
-                    return; // EXIT HERE so we don't create a new one
+                    return;
                 }
             }
-            // ---------------------------------------------
 
-            // 3. Create New Chat (Only if step 2 didn't return)
             using (var trans = await conn.BeginTransactionAsync())
             {
                 try 
@@ -236,7 +353,6 @@ public async Task InitPrivateChat(string targetNick, int myId)
 
                     string addMembersSql = "INSERT INTO chat_member(usr_id, chat_id, status) VALUES(@uid, @cid, 'member')";
                     
-                    // Add Me
                     using(var cmd = new MySqlCommand(addMembersSql, conn, trans))
                     {
                         cmd.Parameters.AddWithValue("@uid", myId);
@@ -244,7 +360,6 @@ public async Task InitPrivateChat(string targetNick, int myId)
                         await cmd.ExecuteNonQueryAsync();
                     }
                     
-                    // Add Target
                     using(var cmd = new MySqlCommand(addMembersSql, conn, trans))
                     {
                         cmd.Parameters.AddWithValue("@uid", targetId);
@@ -262,15 +377,8 @@ public async Task InitPrivateChat(string targetNick, int myId)
             }
         }
 
-        // Notify both parties of the NEW chat
         await Clients.Caller.SendAsync("ChatCreated", chatId, targetNick);
         await Clients.Group(targetNick).SendAsync("ChatCreated", chatId, "Someone"); 
-    }
-
-    public async Task InitiatagroupChat(string name, int myId)
-    {
-        string cs = _config.GetConnectionString("DefaultConnection");
-        
     }
 
     // --- MESSAGING ---
@@ -292,8 +400,8 @@ public async Task InitPrivateChat(string targetNick, int myId)
         return "NOT_FOUND";
     }
 
-    // UPDATED: Now takes chatId and senderId to satisfy DB requirements
-    public async Task SendSecureMessage(int chatId, int senderId, string senderNick, string cipherText, string iv, Dictionary<string, string> keyBundle)
+    // UPDATED: Now uses Clients.Group(recipientNick) which works because of LogIn logic
+    public async Task SendSecureMessage(long chatId, long senderId, string senderNick, string cipherText, string iv, Dictionary<string, string> keyBundle)
     {
         string cs = _config.GetConnectionString("DefaultConnection");
 
@@ -329,7 +437,7 @@ public async Task InitPrivateChat(string targetNick, int myId)
                         foreach (var kvp in keyBundle)
                         {
                             cmd.Parameters["@mid"].Value = messageId;
-                            cmd.Parameters["@name"].Value = kvp.Key; // Nickname
+                            cmd.Parameters["@name"].Value = kvp.Key; 
                             cmd.Parameters["@key"].Value = kvp.Value;
                             await cmd.ExecuteNonQueryAsync();
                         }
@@ -337,11 +445,12 @@ public async Task InitPrivateChat(string targetNick, int myId)
 
                     await trans.CommitAsync();
 
-                    // 3. Notify via SignalR Groups
+                    // 3. Notify via SignalR Groups (Relies on LogIn Group assignment)
                     foreach (var recipientNick in keyBundle.Keys)
                     {
                         string userKey = keyBundle[recipientNick];
-                        await Clients.Group(recipientNick).SendAsync("ReceiveSecureMessage", senderNick, cipherText, iv, userKey);
+                        // Pass chatId back so client knows where to display it
+                        await Clients.Group(recipientNick).SendAsync("ReceiveSecureMessage", senderNick, cipherText, iv, userKey, chatId);
                     }
                 }
                 catch (Exception ex)
@@ -366,7 +475,7 @@ public async Task InitPrivateChat(string targetNick, int myId)
         public DateTime Timestamp { get; set; }
     }
 
-    public async Task<List<HistoryItem>> GetChatHistory(int chatId, int myId)
+    public async Task<List<HistoryItem>> GetChatHistory(long chatId, long myId)
     {
         var history = new List<HistoryItem>();
         string cs = _config.GetConnectionString("DefaultConnection");
