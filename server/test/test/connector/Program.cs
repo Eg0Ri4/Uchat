@@ -209,8 +209,8 @@ while (true)
              foreach(var item in history)
              {
                  try {
-                     if(File.Exists("private.key")) {
-                        string myPriv = File.ReadAllText("{}.key");
+                     if(File.Exists($"{ActiveMail}.key")) {
+                        string myPriv = File.ReadAllText($"{ActiveMail}.key");
                         // Decrypt Key -> Decrypt Message
                         var sessKey = CryptographyService.DecryptSessionKey(item.MyEncryptedKey, myPriv);
                         var txt = CryptographyService.DecryptMessage(item.CipherText, item.IV, sessKey);
