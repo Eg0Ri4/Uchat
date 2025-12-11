@@ -3,13 +3,19 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows.Input;
 using client.Models;
-using CommunityToolkit.Mvvm.Input; // Переконайся, що цей using є, якщо ні - додай
+using client.Services; // <--- ОБОВ'ЯЗКОВО: Доступ до ChatService
+using CommunityToolkit.Mvvm.Input;
+using Avalonia.Threading; // <--- ОБОВ'ЯЗКОВО: Для оновлення UI з іншого потоку
+using System.Threading.Tasks;
 
 namespace client.ViewModels
 {
     public class ChatPageViewModel : ViewModelBase
     {
-        // ----------------- NEW: TITLE (ПРИВІТАННЯ) -----------------
+        // --- ЗБЕРІГАЄМО СЕРВІС ---
+        private readonly ChatService _chatService;
+
+        // ----------------- TITLE -----------------
         private string _welcomeTitle = "Chat";
         public string WelcomeTitle
         {
@@ -17,8 +23,10 @@ namespace client.ViewModels
             set => SetProperty(ref _welcomeTitle, value);
         }
 
-        // ----------------- ACCOUNTS -----------------
+        // ----------------- ACCOUNTS & CHATS -----------------
         public ObservableCollection<AccountInfo> Accounts { get; } = new();
+        public ObservableCollection<ChatDialog> Chats { get; } = new();
+        public ObservableCollection<ChatMessage> Messages { get; } = new();
 
         private AccountInfo? _selectedAccount;
         public AccountInfo? SelectedAccount
@@ -26,15 +34,12 @@ namespace client.ViewModels
             get => _selectedAccount;
             set
             {
-                if (_selectedAccount == value) return;
-                _selectedAccount = value;
-                LoadChatsForAccount(_selectedAccount);
-                OnPropertyChanged(nameof(SelectedAccount)); // На всяк випадок
+                if (SetProperty(ref _selectedAccount, value))
+                {
+                    // Тут можна додати логіку завантаження чатів для конкретного акаунта
+                }
             }
         }
-
-        // ----------------- CHATS -----------------
-        public ObservableCollection<ChatDialog> Chats { get; } = new();
 
         private ChatDialog? _selectedChat;
         public ChatDialog? SelectedChat
@@ -42,22 +47,19 @@ namespace client.ViewModels
             get => _selectedChat;
             set
             {
-                if (_selectedChat == value) return;
-                _selectedChat = value;
-                
-                Messages.Clear();
-                if (_selectedChat != null)
+                if (SetProperty(ref _selectedChat, value))
                 {
-                    foreach (var msg in _selectedChat.Messages)
-                        Messages.Add(msg);
+                    Messages.Clear();
+                    if (_selectedChat != null)
+                    {
+                        foreach (var msg in _selectedChat.Messages)
+                            Messages.Add(msg);
+                    }
                 }
-                OnPropertyChanged(nameof(SelectedChat));
             }
         }
 
-        // ----------------- MESSAGES -----------------
-        public ObservableCollection<ChatMessage> Messages { get; } = new();
-
+        // ----------------- INPUTS -----------------
         private ChatMessage? _editingMessage;
         public ChatMessage? EditingMessage
         {
@@ -79,153 +81,152 @@ namespace client.ViewModels
         public ICommand EditMessageCommand { get; }
         public ICommand DeleteMessageCommand { get; }
 
-
-        // ----------------- CONSTRUCTORS (ОСЬ ТУТ БУЛА ПОМИЛКА) -----------------
-
-        // 1. Головний конструктор (ініціалізує дані)
-        public ChatPageViewModel()
+        // ----------------- КОНСТРУКТОР (ОСНОВНИЙ) -----------------
+        public ChatPageViewModel(ChatService chatService)
         {
-            // Тестові акаунти
-            Accounts.Add(new AccountInfo { Username = "vira",      IsActive = true });
-            Accounts.Add(new AccountInfo { Username = "testUser",  IsActive = false });
+            _chatService = chatService;
+            
+            // Відображаємо нік, під яким зайшли
+            WelcomeTitle = $"Logged in as: {_chatService.MyNick}";
 
-            SelectedAccount = Accounts[0];
+            // 1. ПІДПИСКА НА ВХІДНІ ПОВІДОМЛЕННЯ
+            _chatService.OnMessageReceived += OnMessageReceived;
 
-            // Команди
-            SendMessageCommand       = new RelayCommand(_ => SendCurrentMessage());
-            EditLastMessageCommand   = new RelayCommand(_ => EditLastMessage());
+            // Ініціалізація команд
+            
+            // --- ОСЬ ТУТ БУЛА ПОМИЛКА, ТЕПЕР ВИПРАВЛЕНО ---
+            // Використовуємо AsyncRelayCommand для асинхронного методу
+            SendMessageCommand = new AsyncRelayCommand(SendCurrentMessage); 
+            // ----------------------------------------------
+            
+            EditLastMessageCommand = new RelayCommand(_ => EditLastMessage());
             DeleteLastMessageCommand = new RelayCommand(_ => DeleteLastMessage());
-            
-            // Тут я роз'єднав рядки, які злиплися
-            EditMessageCommand       = new RelayCommand(msg => StartEdit(msg as ChatMessage));
-            DeleteMessageCommand     = new RelayCommand(msg => DeleteMessage(msg as ChatMessage));
-            
-            WelcomeTitle = "Preview Mode";
-        }
+            EditMessageCommand = new RelayCommand(msg => StartEdit(msg as ChatMessage));
+            DeleteMessageCommand = new RelayCommand(msg => DeleteMessage(msg as ChatMessage));
 
-        // 2. ДОДАНИЙ КОНСТРУКТОР: Приймає ім'я (виправляє CS1729)
-        // : this() означає "спочатку виконай код з конструктора вище, потім цей"
-        public ChatPageViewModel(string username) : this()
+            // Завантажуємо тестові чати
+            LoadFakeChats();
+        }
+        
+        // Конструктор для Design-Time
+        public ChatPageViewModel() 
         {
-            if (!string.IsNullOrEmpty(username))
-            {
-                WelcomeTitle = $"Привіт, {username}!";
-            }
-            else
-            {
-                WelcomeTitle = "Привіт, Користувач!";
-            }
+            WelcomeTitle = "Design Mode";
         }
 
-        // ----------------- LOADING CHATS -----------------
-        private void LoadChatsForAccount(AccountInfo? account)
+        // ----------------- ЛОГІКА ПРИЙОМУ (REALTIME) -----------------
+        private void OnMessageReceived(string sender, string text)
         {
-            Chats.Clear();
-            Messages.Clear();
+            // SignalR викликає це з фонового потоку. Треба перемикнутися на UI потік.
+            Dispatcher.UIThread.Invoke(() => 
+            {
+                // 1. Шукаємо чат з цим відправником
+                var chat = Chats.FirstOrDefault(c => c.Title == sender);
+                
+                // 2. Якщо чату немає - створюємо новий
+                if (chat == null)
+                {
+                    chat = new ChatDialog { Id = new Random().Next(100,999), Title = sender };
+                    Chats.Add(chat);
+                }
 
-            if (account == null) return;
+                // 3. Формуємо повідомлення
+                var msg = new ChatMessage 
+                { 
+                    MessageText = text, 
+                    IsIncoming = true,
+                    Time = DateTime.Now.ToShortTimeString()
+                };
 
-            // Чат 1
-            var chat1 = new ChatDialog { Id = 1, Title = "@snake126" };
-            chat1.Messages.Add(new ChatMessage { MessageText = "Hello!",            IsIncoming = true  });
-            chat1.Messages.Add(new ChatMessage { MessageText = "Hi! How are you?",  IsIncoming = false });
-            chat1.Messages.Add(new ChatMessage { MessageText = "I'm fine, thanks!", IsIncoming = true  });
-            chat1.Messages.Add(new ChatMessage { MessageText = "Nice to hear 😊",    IsIncoming = false });
+                // 4. Додаємо в пам'ять чату
+                chat.Messages.Add(msg);
 
-            // Чат 2 (група)
-            var chat2 = new ChatDialog { Id = 2, Title = "Group: Lab Team" };
-            chat2.Messages.Add(new ChatMessage { MessageText = "Hi everyone!",      IsIncoming = true  });
-            chat2.Messages.Add(new ChatMessage { MessageText = "Hi! 👋",            IsIncoming = false });
-            chat2.Messages.Add(new ChatMessage { MessageText = "Ready for lab?",    IsIncoming = true  });
-            chat2.Messages.Add(new ChatMessage { MessageText = "Almost 😅",         IsIncoming = false });
-
-            // Чат 3
-            var chat3 = new ChatDialog { Id = 3, Title = "@miniuser" };
-            chat3.Messages.Add(new ChatMessage { MessageText = "Yo!",               IsIncoming = true  });
-            chat3.Messages.Add(new ChatMessage { MessageText = "Working on uchat",  IsIncoming = false });
-
-            Chats.Add(chat1);
-            Chats.Add(chat2);
-            Chats.Add(chat3);
-
-            SelectedChat = chat1;
+                // 5. Якщо цей чат зараз відкритий - показуємо повідомлення відразу
+                if (SelectedChat == chat)
+                {
+                    Messages.Add(msg);
+                }
+            });
         }
 
-        // ----------------- ACTIONS -----------------
-        private void SendCurrentMessage()
+        // ----------------- ЛОГІКА ВІДПРАВКИ (REALTIME) -----------------
+        private async Task SendCurrentMessage()
         {
             if (string.IsNullOrWhiteSpace(NewMessageText) || SelectedChat == null)
                 return;
 
-            // Редагування
-            if (EditingMessage != null)
-            {
-                EditingMessage.MessageText = NewMessageText;
-                EditingMessage.Time        = DateTime.Now.ToShortTimeString();
-                EditingMessage.IsEdited    = true;
-
-                EditingMessage = null;
-                NewMessageText = string.Empty;
-                return;
-            }
-
-            // Нове повідомлення
-            var myMessage = new ChatMessage
-            {
-                MessageText = NewMessageText,
-                IsIncoming  = false   // моє
-            };
-
-            SelectedChat.Messages.Add(myMessage);
-            Messages.Add(myMessage);
-
-            // Авто-відповідь
-            var reply = new ChatMessage
-            {
-                MessageText = "Auto-reply: got it ✅",
-                IsIncoming  = true
-            };
-
-            SelectedChat.Messages.Add(reply);
-            Messages.Add(reply);
-
+            string textToSend = NewMessageText;
+            string targetNick = SelectedChat.Title; 
+            
             NewMessageText = string.Empty;
+
+            try 
+            {
+                // 1. Додаємо візуально собі
+                var myMessage = new ChatMessage
+                {
+                    MessageText = textToSend,
+                    IsIncoming = false,
+                    Time = DateTime.Now.ToShortTimeString()
+                };
+                SelectedChat.Messages.Add(myMessage);
+                Messages.Add(myMessage);
+
+                // 2. ВІДПРАВЛЯЄМО НА СЕРВЕР
+                int chatId = SelectedChat.Id; 
+                await _chatService.SendMessageAsync(targetNick, textToSend, chatId);
+            }
+            catch (Exception ex)
+            {
+                Messages.Add(new ChatMessage { MessageText = $"[Error]: {ex.Message}", IsIncoming = true });
+            }
+        }
+
+        // ----------------- ІНШІ МЕТОДИ (Load, Edit, Delete) -----------------
+        private void LoadFakeChats()
+        {
+            var chat1 = new ChatDialog { Id = 1, Title = "EchoBot" }; 
+            chat1.Messages.Add(new ChatMessage { MessageText = "Type something...", IsIncoming = true });
+            Chats.Add(chat1);
+            SelectedChat = chat1;
         }
 
         private void EditLastMessage()
         {
             var msg = Messages.LastOrDefault(m => !m.IsIncoming && !m.IsDeleted);
-            if (msg == null) return;
-
-            EditingMessage = msg;
-            NewMessageText = msg.MessageText;
+            if (msg != null)
+            {
+                EditingMessage = msg;
+                NewMessageText = msg.MessageText;
+            }
         }
 
         private void DeleteLastMessage()
         {
             var msg = Messages.LastOrDefault(m => !m.IsIncoming && !m.IsDeleted);
-            if (msg == null) return;
-
-            msg.IsDeleted   = true;
-            msg.MessageText = string.Empty;
+            if (msg != null)
+            {
+                msg.IsDeleted = true;
+                msg.MessageText = string.Empty;
+            }
         }
 
         public void StartEdit(ChatMessage? message)
         {
-            if (message == null) return;
-            if (message.IsIncoming) return;
-
-            EditingMessage = message;
-            NewMessageText = message.MessageText;
+            if (message != null && !message.IsIncoming)
+            {
+                EditingMessage = message;
+                NewMessageText = message.MessageText;
+            }
         }
 
         public void DeleteMessage(ChatMessage? message)
         {
-            if (message == null) return;
-            if (message.IsIncoming) return;
-
-            message.IsDeleted   = true;
-            message.MessageText = string.Empty;
+            if (message != null && !message.IsIncoming)
+            {
+                message.IsDeleted = true;
+                message.MessageText = string.Empty;
+            }
         }
     }
 }

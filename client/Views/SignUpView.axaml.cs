@@ -6,16 +6,29 @@ namespace client.Views
 {
     public partial class SignUpView : UserControl
     {
-        public SignUpView() { InitializeComponent(); }
-
-        private void OnRegisterClick(object sender, RoutedEventArgs e)
+        public SignUpView()
         {
-            if (this.DataContext is MainWindowViewModel vm) vm.OnRegister();
+            InitializeComponent();
         }
 
-        private void OnBackToLoginClick(object sender, RoutedEventArgs e)
+        // Цей метод спрацює, коли ти натиснеш кнопку
+        private void OnRegisterClick(object? sender, RoutedEventArgs e)
         {
-            if (this.DataContext is MainWindowViewModel vm) vm.GoToLogin();
+            // Ми "дістаємо" ViewModel, яка прив'язана до цього вікна
+            if (DataContext is MainWindowViewModel vm)
+            {
+                // І вручну викликаємо метод реєстрації
+                vm.OnRegister();
+            }
+        }
+
+        // Цей метод для кнопки "Sign In" (повернутися назад)
+        private void OnBackToLoginClick(object? sender, RoutedEventArgs e)
+        {
+             if (DataContext is MainWindowViewModel vm)
+            {
+                vm.GoToLogin();
+            }
         }
     }
 }
