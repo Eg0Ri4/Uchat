@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 
-namespace connector; // Ensure this matches the namespace in Program.cs
+namespace connector; 
 
 public class CryptographyService
 {

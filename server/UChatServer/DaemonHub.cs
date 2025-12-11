@@ -264,67 +264,96 @@ public class DaemonHub : Hub
     }
 
     // Added: CREATE GROUP
-    public async Task CreateGroup(string groupName, List<string> participants)
+   public async Task CreateGroup(string groupName, string creatorNick, List<string> participants)
+{
+    string cs = _config.GetConnectionString("DefaultConnection");
+    long newChatId = 0;
+
+    using (var conn = new MySqlConnection(cs))
     {
-        string cs = _config.GetConnectionString("DefaultConnection");
-        long newChatId = 0;
-
-        using (var conn = new MySqlConnection(cs))
+        await conn.OpenAsync();
+        using (var trans = await conn.BeginTransactionAsync())
         {
-            await conn.OpenAsync();
-            using (var trans = await conn.BeginTransactionAsync())
+            try
             {
-                try
+                // 1. Create the Chat Entry (Type = 'group')
+                string createChatSql = "INSERT INTO chats(type) VALUES('group'); SELECT LAST_INSERT_ID();";
+                using (var cmdChat = new MySqlCommand(createChatSql, conn, trans))
                 {
-                    // 1. Create Chat
-                    string createChatSql = "INSERT INTO chats(type) VALUES('group'); SELECT LAST_INSERT_ID();";
-                    using (var cmdChat = new MySqlCommand(createChatSql, conn, trans))
+                    newChatId = Convert.ToInt64(await cmdChat.ExecuteScalarAsync());
+                }
+
+                // Queries for adding members
+                string getUserIdSql = "SELECT id FROM user WHERE nickname = @nick";
+                string addMemberSql = "INSERT INTO chat_member(usr_id, chat_id, status) VALUES(@uid, @cid, @stat)";
+
+                // --- 2. ADD CREATOR (OWNER) ---
+                long creatorId = -1;
+                using (var cmdGetId = new MySqlCommand(getUserIdSql, conn, trans))
+                {
+                    cmdGetId.Parameters.AddWithValue("@nick", creatorNick);
+                    var res = await cmdGetId.ExecuteScalarAsync();
+                    if (res != null) creatorId = Convert.ToInt64(res);
+                }
+
+                if (creatorId != -1)
+                {
+                    using (var cmdAdd = new MySqlCommand(addMemberSql, conn, trans))
                     {
-                        newChatId = Convert.ToInt64(await cmdChat.ExecuteScalarAsync());
+                        cmdAdd.Parameters.AddWithValue("@uid", creatorId);
+                        cmdAdd.Parameters.AddWithValue("@cid", newChatId);
+                        cmdAdd.Parameters.AddWithValue("@stat", "owner"); // Set Creator as Owner
+                        await cmdAdd.ExecuteNonQueryAsync();
+                    }
+                }
+
+                // --- 3. ADD PARTICIPANTS (MEMBERS) ---
+                foreach (var nickname in participants)
+                {
+                    // Skip if the creator is accidentally in the participants list to avoid duplicates
+                    if (nickname.Equals(creatorNick, StringComparison.OrdinalIgnoreCase)) continue;
+
+                    long userId = -1;
+                    using (var cmdGetId = new MySqlCommand(getUserIdSql, conn, trans))
+                    {
+                        cmdGetId.Parameters.AddWithValue("@nick", nickname);
+                        var res = await cmdGetId.ExecuteScalarAsync();
+                        if (res != null) userId = Convert.ToInt64(res);
                     }
 
-                    // 2. Add Members
-                    string getUserIdSql = "SELECT id FROM user WHERE nickname = @nick";
-                    string addMemberSql = "INSERT INTO chat_member(usr_id, chat_id, status) VALUES(@uid, @cid, @stat)";
-
-                    foreach (var nickname in participants)
+                    if (userId != -1)
                     {
-                        long userId = -1;
-                        using (var cmdGetId = new MySqlCommand(getUserIdSql, conn, trans))
+                        using (var cmdAdd = new MySqlCommand(addMemberSql, conn, trans))
                         {
-                            cmdGetId.Parameters.AddWithValue("@nick", nickname);
-                            var result = await cmdGetId.ExecuteScalarAsync();
-                            if (result != null) userId = Convert.ToInt64(result);
-                        }
-
-                        if (userId != -1)
-                        {
-                            using (var cmdAdd = new MySqlCommand(addMemberSql, conn, trans))
-                            {
-                                cmdAdd.Parameters.AddWithValue("@uid", userId);
-                                cmdAdd.Parameters.AddWithValue("@cid", newChatId);
-                                cmdAdd.Parameters.AddWithValue("@stat", "member");
-                                await cmdAdd.ExecuteNonQueryAsync();
-                            }
+                            cmdAdd.Parameters.AddWithValue("@uid", userId);
+                            cmdAdd.Parameters.AddWithValue("@cid", newChatId);
+                            cmdAdd.Parameters.AddWithValue("@stat", "member"); // Set others as Member
+                            await cmdAdd.ExecuteNonQueryAsync();
                         }
                     }
+                }
 
-                    await trans.CommitAsync();
-                }
-                catch
-                {
-                    await trans.RollbackAsync();
-                    throw;
-                }
+                await trans.CommitAsync();
+            }
+            catch
+            {
+                await trans.RollbackAsync();
+                throw;
             }
         }
-
-        // 3. Notify Participants (Using Groups pattern from LogIn)
-        foreach (var user in participants)
-        {
-            await Clients.Group(user).SendAsync("ReceiveGroupInit", newChatId, groupName, participants);
-        }
     }
+
+    // 4. Notify Everyone (Creator + Participants)
+    // We combine the lists to ensure everyone gets the "ReceiveGroupInit" event
+    var allMembers = new List<string>(participants);
+    if (!allMembers.Contains(creatorNick)) allMembers.Add(creatorNick);
+
+    foreach (var user in allMembers)
+    {
+        // Assuming your LogIn method adds connection IDs to a SignalR Group named after their Nickname
+        await Clients.Group(user).SendAsync("ReceiveGroupInit", newChatId, groupName, allMembers);
+    }
+}
 
     public async Task InitPrivateChat(string targetNick, int myId)
     {
@@ -482,7 +511,7 @@ public class DaemonHub : Hub
                     {
                         string userKey = keyBundle[recipientNick];
                         // Pass chatId back so client knows where to display it
-                        await Clients.Group(recipientNick).SendAsync("ReceiveSecureMessage", senderNick, cipherText, iv, userKey, chatId);
+                        await Clients.Group(recipientNick).SendAsync("ReceiveSecureMessage", senderNick, cipherText, iv, userKey, chatId, messageId);
                     }
                 }
                 catch (Exception ex)
@@ -493,6 +522,11 @@ public class DaemonHub : Hub
                 }
             }
         }
+    }
+
+    public async Task deleteMessage(int messageId, string senderNick)
+    {
+        
     }
 
     // --- HISTORY ---
