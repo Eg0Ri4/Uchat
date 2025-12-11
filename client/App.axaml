@@ -1,15 +1,39 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="clr-namespace:client.Converters"
              x:Class="client.App"
              xmlns:local="using:client"
              RequestedThemeVariant="Default">
-             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
 
-    <Application.DataTemplates>
-        <local:ViewLocator/>
-    </Application.DataTemplates>
-  
-    <Application.Styles>
-        <FluentTheme />
-    </Application.Styles>
+	<Application.DataTemplates>
+		<local:ViewLocator/>
+	</Application.DataTemplates>
+
+	<Application.Styles>
+		<!-- Базова Fluent-тема -->
+		<FluentTheme />
+
+		<!-- Accent робимо повністю прозорим -->
+		<Style>
+			<Style.Resources>
+				<!-- Прозорий accent -->
+				<Color x:Key="SystemAccentColor">#00000000</Color>
+				<Color x:Key="SystemAccentColorDark1">#00000000</Color>
+				<Color x:Key="SystemAccentColorDark2">#00000000</Color>
+				<Color x:Key="SystemAccentColorDark3">#00000000</Color>
+				<Color x:Key="SystemAccentColorLight1">#00000000</Color>
+				<Color x:Key="SystemAccentColorLight2">#00000000</Color>
+				<Color x:Key="SystemAccentColorLight3">#00000000</Color>
+
+				<!-- Пензлі для selected / focus – теж прозорі -->
+				<SolidColorBrush x:Key="ThemeAccentBrush"  Color="#00000000" />
+				<SolidColorBrush x:Key="ThemeAccentBrush2" Color="#00000000" />
+				<SolidColorBrush x:Key="ThemeAccentBrush3" Color="#00000000" />
+			</Style.Resources>
+		</Style>
+	</Application.Styles>
+
+	<Application.Resources>
+		<converters:BoolToAlignmentConverter x:Key="BoolToAlignmentConverter" />
+	</Application.Resources>
 </Application>

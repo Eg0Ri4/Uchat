@@ -4,12 +4,13 @@
   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
   xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
   xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+  xmlns:vm="using:client.ViewModels"
   d:DesignHeight="600"
   d:DesignWidth="800"
+  x:DataType="vm:MainWindowViewModel"
   mc:Ignorable="d">
 
   <UserControl.Styles>
-
     <Style Selector="TextBox">
       <Setter Property="Background" Value="#2B2B2B" />
       <Setter Property="Foreground" Value="White" />
@@ -26,24 +27,8 @@
     <Style Selector="TextBox:focus">
       <Setter Property="Background" Value="#3A3A3A" />
       <Setter Property="BorderThickness" Value="2" />
-      <Setter Property="BorderBrush" Value="#00FFFF" /> 
+      <Setter Property="BorderBrush" Value="#00FFFF" />
     </Style>
-
-    <Style Selector="TextBox /template/ Button#RevealButton /template/ Path">
-      <Setter Property="Fill" Value="White" />
-    </Style>
-
-
-    <Style Selector="CheckBox /template/ ContentPresenter">
-      <Setter Property="Foreground" Value="#888888" />
-    </Style>
-    <Style Selector="CheckBox:pointerover /template/ ContentPresenter">
-      <Setter Property="Foreground" Value="#888888" />
-    </Style>
-    <Style Selector="CheckBox:pressed /template/ ContentPresenter">
-      <Setter Property="Foreground" Value="#888888" />
-    </Style>
-
   </UserControl.Styles>
 
   <Grid>
@@ -68,7 +53,6 @@
             Width="30"
             Height="30"
             VerticalAlignment="Center">
-            <Image Source="/Assets/Images/Logo.png" Stretch="UniformToFill" />
             <TextBlock
               Margin="-10,0,0,0"
               HorizontalAlignment="Center"
@@ -101,13 +85,12 @@
         <TextBlock
           FontSize="12"
           Foreground="#AAAAAA"
-          Text="Username *"
-           />
+          Text="Username *" />
         <TextBox
           Height="40"
           CornerRadius="8"
-          Watermark="Username"
-           />
+          Text="{Binding RegUsernameInput}"
+          Watermark="Username" />
 
         <TextBlock
           FontSize="12"
@@ -116,6 +99,7 @@
         <TextBox
           Height="40"
           CornerRadius="8"
+          Text="{Binding RegEmailInput}"
           Watermark="Email" />
 
         <TextBlock
@@ -127,6 +111,7 @@
           CornerRadius="8"
           PasswordChar="•"
           RevealPassword="True"
+          Text="{Binding RegPasswordInput}"
           Watermark="Password" />
 
         <StackPanel Margin="0,-5,0,5" Orientation="Horizontal">
@@ -151,6 +136,7 @@
           HorizontalContentAlignment="Center"
           VerticalContentAlignment="Center"
           Background="White"
+          Click="OnRegisterClick"
           Content="Sign up"
           CornerRadius="25"
           FontWeight="Bold"
@@ -165,10 +151,16 @@
             Padding="5,0,0,0"
             Background="Transparent"
             BorderThickness="0"
+            Command="{Binding GoToLoginCommand}"
             Content="Sign in"
             FontWeight="Bold"
             Foreground="White" />
         </StackPanel>
+
+        <TextBlock
+          HorizontalAlignment="Center"
+          Foreground="Red"
+          Text="{Binding StatusMessage}" />
 
       </StackPanel>
     </Border>

@@ -292,6 +292,25 @@ while (true)
             {
                 Console.WriteLine($"[Error fetching history] {ex.Message}");
             }
+             Console.WriteLine($"\n--- History with {targetNick} ---");
+             foreach(var item in history)
+             {
+                 try {
+                     if(File.Exists($"{ActiveMail}.key")) {
+                        string myPriv = File.ReadAllText($"{ActiveMail}.key");
+                        // Decrypt Key -> Decrypt Message
+                        var sessKey = CryptographyService.DecryptSessionKey(item.MyEncryptedKey, myPriv);
+                        var txt = CryptographyService.DecryptMessage(item.CipherText, item.IV, sessKey);
+                        
+                        Console.WriteLine($"[{item.Timestamp.ToShortTimeString()}] {item.Sender}: {txt}");
+                     } else {
+                        Console.WriteLine($"[{item.Timestamp.ToShortTimeString()}] {item.Sender}: [LOCKED]");
+                     }
+                 } catch {
+                     Console.WriteLine($"[{item.Timestamp.ToShortTimeString()}] {item.Sender}: [Decryption Error]");
+                 }
+             }
+             Console.WriteLine("-------------------------------");
         }
     }
     catch (Exception ex)

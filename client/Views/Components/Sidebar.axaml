@@ -1,0 +1,356 @@
+﻿<UserControl
+    x:Class="client.Views.Components.Sidebar"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+	<!-- СТИЛІ -->
+	<UserControl.Styles>
+
+		<!-- Бургер-кнопка -->
+		<Style Selector="Button.menuButton">
+			<Setter Property="Width" Value="26"/>
+			<Setter Property="Height" Value="20"/>
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="BorderBrush" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="Padding" Value="0"/>
+		</Style>
+
+		<Style Selector="Button.menuButton:pointerover">
+			<Setter Property="Background" Value="#20000000"/>
+		</Style>
+
+		<Style Selector="Button.menuButton:pressed">
+			<Setter Property="Background" Value="#40000000"/>
+		</Style>
+
+		<!-- Кнопки пунктів меню в бургер-режимі -->
+		<Style Selector="Button.menuItemButton">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="Padding" Value="6,4"/>
+			<Setter Property="HorizontalContentAlignment" Value="Left"/>
+		</Style>
+
+		<Style Selector="Button.menuItemButton:pointerover">
+			<Setter Property="Background" Value="#20FFFFFF"/>
+		</Style>
+
+		<Style Selector="Button.menuItemButton:pressed">
+			<Setter Property="Background" Value="#30FFFFFF"/>
+		</Style>
+
+		<!-- ===== АККАУНТИ ===== -->
+		<Style Selector="ListBox#AccountsListBox > ListBoxItem">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="Padding" Value="0"/>
+			<Setter Property="Margin" Value="0,4"/>
+		</Style>
+
+		<Style Selector="ListBox#AccountsListBox > ListBoxItem:pointerover">
+			<Setter Property="Background" Value="Transparent"/>
+		</Style>
+
+		<Style Selector="ListBox#AccountsListBox > ListBoxItem:selected">
+			<Setter Property="Background" Value="Transparent"/>
+		</Style>
+
+		<Style Selector="Border.accountItem">
+			<Setter Property="CornerRadius" Value="30"/>
+			<Setter Property="Padding" Value="12,6"/>
+			<Setter Property="Margin" Value="0,4"/>
+			<Setter Property="Background" Value="Transparent"/>
+		</Style>
+
+		<Style Selector="ListBox#AccountsListBox > ListBoxItem:selected Border.accountItem">
+			<Setter Property="Background" Value="#363131"/>
+		</Style>
+
+		<!-- ===== ЧАТИ ===== -->
+		<Style Selector="ListBox#ChatsListBox > ListBoxItem">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="Padding" Value="0"/>
+			<Setter Property="Margin" Value="0,4"/>
+		</Style>
+
+		<Style Selector="ListBox#ChatsListBox > ListBoxItem:pointerover">
+			<Setter Property="Background" Value="Transparent"/>
+		</Style>
+
+		<Style Selector="ListBox#ChatsListBox > ListBoxItem:selected">
+			<Setter Property="Background" Value="Transparent"/>
+		</Style>
+
+		<Style Selector="Border.chatItem">
+			<Setter Property="CornerRadius" Value="11"/>
+			<Setter Property="Padding" Value="12,10"/>
+			<Setter Property="Margin" Value="0,4"/>
+			<Setter Property="Background" Value="Transparent"/>
+		</Style>
+
+		<Style Selector="ListBox#ChatsListBox > ListBoxItem:selected Border.chatItem">
+			<Setter Property="Background" Value="#FF363131"/>
+		</Style>
+
+		<!-- ===== ПОШУК ===== -->
+		<Style Selector="Border.searchBox">
+			<Setter Property="Background" Value="#17171D"/>
+			<Setter Property="CornerRadius" Value="20"/>
+			<Setter Property="Padding" Value="10,6"/>
+		</Style>
+
+	</UserControl.Styles>
+
+
+	<!-- ВМІСТ САЙДБАРУ -->
+	<Border Background="#9B191717"
+            BorderBrush="#12FFFFFF"
+            BorderThickness="1"
+            Padding="20,16">
+
+		<Grid RowDefinitions="Auto,*">
+
+			<!-- БУРГЕР -->
+			<Button Grid.Row="0"
+                    x:Name="MenuButton"
+                    Classes="menuButton"
+                    HorizontalAlignment="Left"
+                    Click="MenuButton_OnClick"
+                    Margin="0,0,0,8">
+				<Image Source="/Assets/icon-burger.png"
+                       Width="26"
+                       Height="20"
+                       Stretch="Uniform"/>
+			</Button>
+
+			<!-- ОБЛАСТЬ, ДЕ МИ ПЕРЕМИКАЄМО ДВА РЕЖИМИ -->
+			<Grid Grid.Row="1">
+
+				<!-- ==== ОСНОВНИЙ САЙДБАР (акаунти + чати) ==== -->
+				<Grid x:Name="MainSidebarGrid">
+					<Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*"
+                          RowSpacing="10">
+
+						<!-- Заголовок "My accounts" + замок -->
+						<StackPanel Grid.Row="0"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Top"
+                                    Margin="0,0,0,8"
+                                    Spacing="6">
+							<TextBlock Text="My accounts"
+                                       Foreground="White"
+                                       FontSize="18"
+                                       FontWeight="SemiBold"/>
+
+							<Image Source="/Assets/lock.png"
+                                   Width="16"
+                                   Height="16"
+                                   VerticalAlignment="Center"
+                                   Opacity="0.8"/>
+						</StackPanel>
+
+						<!-- Список акаунтів -->
+						<ListBox Grid.Row="1"
+                                 x:Name="AccountsListBox"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 ItemsSource="{Binding Accounts}"
+                                 SelectedItem="{Binding SelectedAccount}">
+							<ListBox.ItemTemplate>
+								<DataTemplate>
+									<Border Classes="accountItem">
+										<StackPanel Orientation="Horizontal"
+                                                    VerticalAlignment="Center"
+                                                    Spacing="8">
+
+											<Border Width="32"
+                                                    Height="32"
+                                                    CornerRadius="16"
+                                                    Background="#2A2A30">
+												<TextBlock Text="👤"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           FontSize="16"/>
+											</Border>
+
+											<StackPanel Orientation="Vertical">
+												<TextBlock Text="{Binding Username}"
+                                                           Foreground="White"
+                                                           FontSize="14"/>
+												<TextBlock Text="account"
+                                                           Foreground="#B0B0B0"
+                                                           FontSize="11"/>
+											</StackPanel>
+										</StackPanel>
+									</Border>
+								</DataTemplate>
+							</ListBox.ItemTemplate>
+						</ListBox>
+
+						<!-- "+ Add account" -->
+						<TextBlock Grid.Row="2"
+                                   Text="+ Add account"
+                                   Foreground="#B0B0B0"
+                                   FontSize="13"
+                                   Margin="0,2,0,4"/>
+
+						<!-- Пошук -->
+						<Border Grid.Row="3"
+                                Classes="searchBox"
+                                Margin="0,4">
+							<Grid ColumnDefinitions="Auto,*"
+                                  VerticalAlignment="Center">
+								<Image Source="/Assets/search-icon.png"
+                                       Width="16"
+                                       Height="16"
+                                       Grid.Column="0"
+                                       Opacity="0.8"/>
+
+								<TextBox Grid.Column="1"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         Foreground="White"
+                                         Watermark="Search"
+                                         FontSize="13"
+                                         Margin="8,0,0,0"/>
+							</Grid>
+						</Border>
+
+						<!-- Заголовок "Chats" -->
+						<TextBlock Grid.Row="4"
+                                   Text="Chats"
+                                   Foreground="White"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Margin="0,8,0,4"/>
+
+						<!-- Список чатів -->
+						<ListBox Grid.Row="5"
+                                 x:Name="ChatsListBox"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 ItemsSource="{Binding Chats}"
+                                 SelectedItem="{Binding SelectedChat}">
+							<ListBox.ItemTemplate>
+								<DataTemplate>
+									<Border Classes="chatItem">
+										<Grid ColumnDefinitions="Auto,*"
+                                              VerticalAlignment="Center"
+                                              ColumnSpacing="8">
+
+											<Border Grid.Column="0"
+                                                    Width="32"
+                                                    Height="32"
+                                                    CornerRadius="16"
+                                                    Background="#2A2A30">
+												<TextBlock Text="💬"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           FontSize="14"/>
+											</Border>
+
+											<StackPanel Grid.Column="1"
+                                                        Orientation="Vertical">
+												<TextBlock Text="{Binding Title}"
+                                                           Foreground="White"
+                                                           FontSize="14"/>
+												<TextBlock Text="message"
+                                                           Foreground="#B0B0B0"
+                                                           FontSize="11"/>
+											</StackPanel>
+
+										</Grid>
+									</Border>
+								</DataTemplate>
+							</ListBox.ItemTemplate>
+						</ListBox>
+
+					</Grid>
+				</Grid>
+
+				<!-- ==== МЕНЮ (екран з Create channel / group / contacts) ==== -->
+				<Grid x:Name="MenuGrid" IsVisible="False">
+					<StackPanel Margin="0,24,0,0"
+                                Spacing="32">
+
+						<!-- Аватар + Username -->
+						<StackPanel Orientation="Horizontal"
+                                    Spacing="16">
+							<Border Width="72"
+                                    Height="72"
+                                    CornerRadius="36"
+                                    Background="#2A2A30">
+								<!-- Тут пізніше можна підставити фото юзера -->
+								<TextBlock Text="👤"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontSize="28"/>
+							</Border>
+
+							<StackPanel VerticalAlignment="Center">
+								<TextBlock Text="{Binding SelectedAccount.Username}"
+                                           Foreground="White"
+                                           FontSize="22"
+                                           FontWeight="SemiBold"/>
+								<TextBlock Text="online"
+                                           Foreground="#B0B0B0"
+                                           FontSize="12"/>
+							</StackPanel>
+						</StackPanel>
+
+						<!-- Пункти меню -->
+						<StackPanel Spacing="8">
+
+							<!-- Create channel -->
+							<Button Classes="menuItemButton">
+								<StackPanel Orientation="Horizontal"
+                                            Spacing="12">
+									<Image Source="/Assets/icon-channel.png"
+                                           Width="24"
+                                           Height="24"
+                                           VerticalAlignment="Center"/>
+									<TextBlock Text="Create channel"
+                                               Foreground="White"
+                                               FontSize="20"/>
+								</StackPanel>
+							</Button>
+
+							<!-- Create group -->
+							<Button Classes="menuItemButton">
+								<StackPanel Orientation="Horizontal"
+                                            Spacing="12">
+									<Image Source="/Assets/icon-group.png"
+                                           Width="24"
+                                           Height="24"
+                                           VerticalAlignment="Center"/>
+									<TextBlock Text="Create group"
+                                               Foreground="White"
+                                               FontSize="20"/>
+								</StackPanel>
+							</Button>
+
+							<!-- Contacts -->
+							<Button Classes="menuItemButton">
+								<StackPanel Orientation="Horizontal"
+                                            Spacing="12">
+									<Image Source="/Assets/icon-user.png"
+                                           Width="24"
+                                           Height="24"
+                                           VerticalAlignment="Center"/>
+									<TextBlock Text="Contacts"
+                                               Foreground="White"
+                                               FontSize="20"/>
+								</StackPanel>
+							</Button>
+
+						</StackPanel>
+					</StackPanel>
+				</Grid>
+
+			</Grid>
+		</Grid>
+	</Border>
+
+</UserControl>

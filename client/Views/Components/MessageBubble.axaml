@@ -1,0 +1,100 @@
+﻿<UserControl
+    x:Class="client.Views.Components.MessageBubble"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="clr-namespace:client.Converters">
+
+	<UserControl.Resources>
+		<converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+		<converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter" />
+		<converters:BoolToAlignmentConverter x:Key="BoolToAlignmentConverter" />
+	</UserControl.Resources>
+
+	<!-- Один елемент чату -->
+	<Grid Margin="0,4">
+		<Grid.ColumnDefinitions>
+			<!-- колонка під аватар -->
+			<ColumnDefinition Width="Auto" />
+			<!-- колонка під бульбашку -->
+			<ColumnDefinition Width="*" />
+		</Grid.ColumnDefinitions>
+
+		<!-- Аватарка — тільки для вхідних -->
+		<Border Grid.Column="0"
+                Width="32" Height="32"
+                CornerRadius="16"
+                Margin="0,0,8,0"
+                ClipToBounds="True"
+                IsVisible="{Binding IsIncoming, Converter={StaticResource BoolToVisibilityConverter}}">
+			<Image Source="/Assets/avatar.png"
+                   Stretch="UniformToFill" />
+		</Border>
+
+		<!-- Колонка з бульбашкою -->
+		<Grid Grid.Column="1">
+			<!-- Вирівнювання всього блоку ліво/право -->
+			<Grid HorizontalAlignment="{Binding IsIncoming, Converter={StaticResource BoolToAlignmentConverter}}">
+				<Grid>
+
+					<!-- Основна бульбашка -->
+					<Border Background="{Binding BubbleColor}"
+                            CornerRadius="30"
+                            Padding="20,14"
+                            MinWidth="140"
+                            MaxWidth="510"
+                            BorderThickness="1"
+                            BorderBrush="#010101">
+
+						<Border.ContextMenu>
+							<ContextMenu>
+								<MenuItem Header="Edit"   Click="OnEditClick" />
+								<MenuItem Header="Delete" Click="OnDeleteClick" />
+							</ContextMenu>
+						</Border.ContextMenu>
+
+						<StackPanel>
+							<!-- Текст повідомлення -->
+							<TextBlock Text="{Binding DisplayText}"
+                                       TextWrapping="Wrap"
+                                       Foreground="White"
+                                       FontSize="14"
+                                       Margin="0,0,0,4" />
+
+							<!-- Час + "дві галочки" справа внизу -->
+							<StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Right"
+                                        Spacing="4">
+								<TextBlock Text="{Binding Time}"
+                                           Foreground="#B3FFFFFF"
+                                           FontSize="11" />
+
+								<TextBlock Text="✓✓"
+                                           Foreground="#B3FFFFFF"
+                                           FontSize="11" />
+							</StackPanel>
+						</StackPanel>
+					</Border>
+
+					<!-- Хвостик для вхідного повідомлення (зліва) -->
+					<Path Fill="{Binding BubbleColor}"
+                          HorizontalAlignment="Left"
+                          VerticalAlignment="Bottom"
+                          Margin="-6,0,0,10"
+                          Width="18" Height="18"
+                          IsVisible="{Binding IsIncoming, Converter={StaticResource BoolToVisibilityConverter}}"
+                          Data="M0,18 L18,18 L6,0 Z" />
+
+					<!-- Хвостик для вихідного повідомлення (справа) -->
+					<Path Fill="{Binding BubbleColor}"
+                          HorizontalAlignment="Right"
+                          VerticalAlignment="Bottom"
+                          Margin="0,0,-6,10"
+                          Width="18" Height="18"
+                          IsVisible="{Binding IsIncoming, Converter={StaticResource InverseBoolToVisibilityConverter}}"
+                          Data="M0,18 L18,18 L12,0 Z" />
+
+				</Grid>
+			</Grid>
+		</Grid>
+	</Grid>
+</UserControl>

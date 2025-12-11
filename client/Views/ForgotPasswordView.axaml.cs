@@ -1,13 +1,30 @@
 using Avalonia.Controls;
+using Avalonia.Interactivity;
+using client.ViewModels;
 
-namespace client.Views // 👈 ПРАВИЛЬНИЙ NAMESPACE
+namespace client.Views
 {
-    // 'partial' обов'язковий для Avalonia
-    public partial class ForgotPasswordView : UserControl // 👈 ПРАВИЛЬНА НАЗВА КЛАСУ
+    public partial class ForgotPasswordView : UserControl
     {
         public ForgotPasswordView()
         {
-            InitializeComponent(); // Ця функція запрацює
+            InitializeComponent();
+        }
+
+        private void OnRecoverClick(object? sender, RoutedEventArgs e)
+        {
+            if (this.DataContext is MainWindowViewModel vm)
+            {
+                vm.OnRecoverPassword();
+            }
+        }
+
+        private void OnBackToLoginClick(object? sender, RoutedEventArgs e)
+        {
+            if (this.DataContext is MainWindowViewModel vm)
+            {
+                vm.GoToLogin();
+            }
         }
     }
 }
