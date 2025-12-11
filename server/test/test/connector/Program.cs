@@ -1,128 +1,187 @@
-using Microsoft.AspNetCore.SignalR.Client;
-using connector; // Ensure this matches your namespace
+using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.SignalR.Client;
+using connector; 
 
 // --- 1. CONFIGURATION ---
 string serverIp = "localhost";
 int serverPort = 5000;
-if (args.Length > 0) serverIp = args[0];
-if (args.Length > 1 && int.TryParse(args[1], out int p)) serverPort = p;
-string ActiveMail = "example@mail.com";
-
 string hubUrl = $"http://{serverIp}:{serverPort}/hubs/daemon";
-Console.WriteLine($"Target Server: {hubUrl}");
 
-// --- 2. BUILD CONNECTION ---
+// --- 2. CLIENT STATE ---
+long myId = -1; // Changed to long
+string myNick = "Guest";
+string ActiveMail = "guest@mail.com";
+Dictionary<string, long> activeChats = new Dictionary<string, long>(); // Map Nick -> ChatID
+
+// --- 3. CONNECTION ---
 var connection = new HubConnectionBuilder()
     .WithUrl(hubUrl)
     .WithAutomaticReconnect(new InfiniteRetryPolicy())
     .Build();
 
-// --- 3. REGISTER LISTENERS ---
+// --- 4. LISTENERS ---
 
-// A. Standard Plaintext/System Messages
-connection.On<string, string>("ReceiveSystem", (user, message) =>
+// A. Login Success
+connection.On<long, string>("LoginSuccess", (id, nick) =>
 {
-    Console.WriteLine($"\r[{user}]: {message}");
+    myId = id;
+    myNick = nick;
+    Console.WriteLine($"\n[System] Logged in as {myNick} (ID: {myId})");
+    Console.Write($"{myNick}> ");
 });
 
-// B. Secure Messages (THE TEST TARGET)
-connection.On<string, string, string, string>("ReceiveSecureMessage", (sender, cipherText, iv, myEncryptedKey) =>
+// B. Group Init
+connection.On<long, string, List<string>>("ReceiveGroupInit", (chatId, groupName, participants) =>
 {
+    // We treat the group name as a "User" for the activeChats dictionary for simplicity
+    activeChats[groupName] = chatId;
+    Console.WriteLine($"\n[System] Group '{groupName}' (ID: {chatId}) created.");
+    Console.WriteLine($"[System] Members: {string.Join(", ", participants)}");
+    Console.Write($"{myNick}> ");
+});
+
+// C. Chat Created (Private)
+connection.On<long, string>("ChatCreated", (chatId, targetNick) =>
+{
+    activeChats[targetNick] = chatId;
+    Console.WriteLine($"\n[System] Chat #{chatId} established with {targetNick}.");
+    Console.Write($"{myNick}> ");
+});
+
+// D. Receive Secure Message
+connection.On<string, string, string, string, long>("ReceiveSecureMessage", (sender, cipherText, iv, myEncryptedKey, chatId) =>
+{
+    Console.WriteLine(); 
     try 
     {
         if (!File.Exists($"{ActiveMail}.key")) 
         {
-            Console.WriteLine($"\r[{sender}]: [LOCKED - No Private Key Found]");
-            Console.Write("You: ");
-            return;
+            Console.WriteLine($"[Chat {chatId}] {sender}: [LOCKED]");
         }
-
-        string myPrivKey = File.ReadAllText($"{ActiveMail}.key");
-
-        // 1. Unlock the Session Key (RSA)
-        byte[] sessionKey = CryptographyService.DecryptSessionKey(myEncryptedKey, myPrivKey);
-
-        // 2. Unlock the Message (AES)
-        string plainText = CryptographyService.DecryptMessage(cipherText, iv, sessionKey);
-
-        Console.WriteLine($"\r[{sender} 🔒]: {plainText}");
+        else
+        {
+            string myPrivKey = File.ReadAllText($"{ActiveMail}.key");
+            byte[] sessionKey = CryptographyService.DecryptSessionKey(myEncryptedKey, myPrivKey);
+            string plainText = CryptographyService.DecryptMessage(cipherText, iv, sessionKey);
+            Console.WriteLine($"[Chat {chatId}] {sender} 🔒: {plainText}");
+        }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"\r[{sender}]: [Decryption Failed: {ex.Message}]");
+        Console.WriteLine($"[Chat {chatId}] {sender}: [Error: {ex.Message}]");
     }
-    Console.Write("You: ");
+    if(myId != -1) Console.Write($"{myNick}> ");
 });
 
-// C. Private Key Receipt
+// E. Search/System/Key
+connection.On<List<string>>("ReceiveSearchResults", (users) =>
+{
+    Console.WriteLine($"\n--- Users Found ---");
+    foreach (var u in users) Console.WriteLine($" - {u}");
+    Console.WriteLine("-------------------");
+    Console.Write($"{myNick}> ");
+});
+
+connection.On<string, string>("ReceiveSystem", (user, message) =>
+{
+    Console.WriteLine($"\r[{user}]: {message}");
+    if (myId != -1) Console.Write($"{myNick}> ");
+});
+
 connection.On<string>("ReceivePrivateKey", (key) =>
 {
-    Console.WriteLine($"\n[System] REGISTRATION SUCCESS!");
     File.WriteAllText($"{ActiveMail}.key", key);
-    Console.WriteLine($"[System] Private Key saved to '{ActiveMail}.key'");
-    Console.Write("You: ");
+    Console.WriteLine($"[System] Key saved.");
+    Console.Write($"{myNick}> ");
 });
-
-// D. Connection Lifecycle
-connection.Reconnecting += error => { Console.WriteLine($"\nReconnecting..."); return Task.CompletedTask; };
-connection.Reconnected += id => { Console.WriteLine($"\nRestored!"); Console.Write("You: "); return Task.CompletedTask; };
 
 await ConnectWithRetryAsync(connection);
 
-// --- 4. MAIN COMMAND LOOP ---
+// --- 5. MAIN LOOP ---
 Console.WriteLine("\n--- COMMANDS ---");
-Console.WriteLine("/register [email] [password] [nickname]");
-Console.WriteLine("/login [email] [password]");
-Console.WriteLine("/msg [nickname] [message]");
+Console.WriteLine("/register [email] [pass] [nick]");
+Console.WriteLine("/login [email] [pass]");
+Console.WriteLine("/search [query]");
+Console.WriteLine("/chat [target]                -> Init Private Chat");
+Console.WriteLine("/create [Group] [User1] ...   -> Create Group");
+Console.WriteLine("/msg [target/Group] [text]    -> Send Message (Private or Group Name)");
 Console.WriteLine("----------------\n");
-
-string currentUser = "Guest";
 
 while (true)
 {
-    Console.Write("You: ");
+    Console.Write($"{myNick}> ");
     string? input = Console.ReadLine();
     if (string.IsNullOrWhiteSpace(input)) continue;
-    
-    // --- REGISTER ---
-    if (input.StartsWith("/register"))
-    {
-        var parts = input.Split(' ');
-        if (parts.Length < 4) { Console.WriteLine("Usage: /register email pass nick"); continue; }
-        await connection.InvokeAsync("Register", parts[3], parts[1], parts[2]); // nick, mail, pass
-        currentUser = parts[3];
-        ActiveMail = parts[1];
-    }
-    // --- LOGIN ---
-    else if (input.StartsWith("/login"))
-    {
-        var parts = input.Split(' ');
-        if (parts.Length < 3) { Console.WriteLine("Usage: /login email pass"); continue; }
-        await connection.InvokeAsync("LogIn", parts[1], parts[2]);
-        ActiveMail = parts[1];
-        
-        // Optional: Fetch History here
-    }
-    // --- SECURE MESSAGE ---
-    else if (input.StartsWith("/msg"))
-    {
-        // Usage: /msg Bob Hello World
-        var parts = input.Split(' ', 3);
-        if (parts.Length < 3) { Console.WriteLine("Usage: /msg Bob Hello World"); continue; }
 
-        string target = parts[1];
-        string messageText = parts[2];
-        var recipients = new List<string> { target, currentUser }; // Add self for history
+    string[] parts = input.Split(' ');
+    string cmd = parts[0].ToLower();
 
-        Console.WriteLine("[System] Encrypting...");
-
-        try 
+    try 
+    {
+        if (cmd == "/login")
         {
-            // 1. Get Public Keys
-            var keys = await connection.InvokeAsync<Dictionary<string, string>>("GetPublicKeys", recipients);
+            if (parts.Length < 3) Console.WriteLine("Usage: /login email pass");
+            else { await connection.InvokeAsync("LogIn", parts[1], parts[2]); ActiveMail = parts[1]; }
+        }
+        else if (cmd == "/register")
+        {
+            if (parts.Length < 4) Console.WriteLine("Usage: /register email pass nick");
+            else { await connection.InvokeAsync("register", parts[1], parts[2], parts[3]); ActiveMail = parts[1]; }
+        }
+        else if (cmd == "/search")
+        {
+            if (parts.Length < 2) Console.WriteLine("Usage: /search query");
+            else await connection.InvokeAsync("SearchUsers", parts[1]);
+        }
+        else if (cmd == "/chat")
+        {
+            if (myId == -1) { Console.WriteLine("Login first."); continue; }
+            if (parts.Length < 2) Console.WriteLine("Usage: /chat target");
+            else await connection.InvokeAsync("InitPrivateChat", parts[1], (int)myId); // Cast to int if server expects int, or update server to long
+        }
+        else if (cmd == "/create")
+        {
+            // /create MyGroup Bob Alice
+            if (myId == -1) { Console.WriteLine("Login first."); continue; }
+            if (parts.Length < 3) { Console.WriteLine("Usage: /create Name User1 User2..."); continue; }
+            
+            string groupName = parts[1];
+            var participants = parts.Skip(2).ToList();
+            if(!participants.Contains(myNick)) participants.Add(myNick);
 
-            // 2. Encrypt
+            await connection.InvokeAsync("CreateGroup", groupName, participants);
+        }
+        else if (cmd == "/msg")
+        { 
+            if (myId == -1) { Console.WriteLine("Login first."); continue; }
+            if (parts.Length < 3) { Console.WriteLine("Usage: /msg target text"); continue; }
+
+            string target = parts[1];
+            string messageText = string.Join(" ", parts.Skip(2));
+
+            // Check if we have an active chat ID for this target (Group Name or User Nick)
+            if (!activeChats.ContainsKey(target))
+            {
+                Console.WriteLine($"[Error] No active chat ID found for '{target}'.");
+                Console.WriteLine("Use '/chat target' for private or '/create' for groups.");
+                continue;
+            }
+
+            long chatId = activeChats[target];
+            List<string> participants;
+
+            // Determine participants
+            // 1. If it's a private chat, we need to manually reconstruct the list: Me + Target
+            // 2. If it's a group, we need to ask the server who is in it.
+            // Simplified approach: Ask server for participants of this ChatID
+            participants = await connection.InvokeAsync<List<string>>("GetChatParticipants", chatId);
+
+            // Encryption Sequence
+            var keys = await connection.InvokeAsync<Dictionary<string, string>>("GetPublicKeys", participants);
             byte[] sessionKey = CryptographyService.GenerateSessionKey();
             var encryptedBody = CryptographyService.EncryptMessage(messageText, sessionKey);
 
@@ -131,27 +190,117 @@ while (true)
             {
                 keyBundle[user.Key] = CryptographyService.EncryptSessionKey(sessionKey, user.Value);
             }
-
-            // 3. Send
-            await connection.InvokeAsync("SendSecureMessage", currentUser, encryptedBody.CipherText, encryptedBody.IV, keyBundle);
-            Console.WriteLine($"[System] Sent secure message.");
-        }
-        catch (Exception ex)
+            
+            // Send
+            await connection.InvokeAsync("SendSecureMessage", chatId, myId, myNick, encryptedBody.CipherText, encryptedBody.IV, keyBundle);
+            Console.WriteLine($"[System] Sent.");
+        }else if (cmd == "/history")
         {
-            Console.WriteLine($"[Error] {ex.Message}");
+            if (myId == -1) { Console.WriteLine("Login first."); continue; }
+            if (parts.Length < 2) { Console.WriteLine("Usage: /history target_nick_or_group"); continue; }
+            
+            string target = parts[1];
+            
+            if (!activeChats.ContainsKey(target)) 
+            { 
+                Console.WriteLine($"Chat with '{target}' is not active locally."); 
+                Console.WriteLine("Try /chat or /create first to sync the ID.");
+                continue; 
+            }
+
+            long chatId = activeChats[target];
+            
+            try 
+            {
+                // Call server to get history items
+                var history = await connection.InvokeAsync<List<HistoryItem>>("GetChatHistory", chatId, myId);
+
+                Console.WriteLine($"\n--- History for {target} (Chat {chatId}) ---");
+                
+                string myPrivKey = "";
+                if (File.Exists($"{ActiveMail}.key")) myPrivKey = File.ReadAllText($"{ActiveMail}.key");
+
+                foreach(var item in history)
+                {
+                    string displayMsg = "[LOCKED]";
+                    if (!string.IsNullOrEmpty(myPrivKey))
+                    {
+                        try 
+                        {
+                            var sessKey = CryptographyService.DecryptSessionKey(item.MyEncryptedKey, myPrivKey);
+                            displayMsg = CryptographyService.DecryptMessage(item.CipherText, item.IV, sessKey);
+                        }
+                        catch 
+                        {
+                            displayMsg = "[Decryption Error]";
+                        }
+                    }
+                    Console.WriteLine($"[{item.Timestamp.ToShortTimeString()}] {item.Sender}: {displayMsg}");
+                }
+                Console.WriteLine("--------------------------------------------");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Error fetching history] {ex.Message}");
+            }
+        }else if (cmd == "/history")
+        {
+            if (myId == -1) { Console.WriteLine("Login first."); continue; }
+            if (parts.Length < 2) { Console.WriteLine("Usage: /history target_nick_or_group"); continue; }
+            
+            string target = parts[1];
+            
+            if (!activeChats.ContainsKey(target)) 
+            { 
+                Console.WriteLine($"Chat with '{target}' is not active locally."); 
+                Console.WriteLine("Try /chat or /create first to sync the ID.");
+                continue; 
+            }
+
+            long chatId = activeChats[target];
+            
+            try 
+            {
+                // Call server to get history items
+                var history = await connection.InvokeAsync<List<HistoryItem>>("GetChatHistory", chatId, myId);
+
+                Console.WriteLine($"\n--- History for {target} (Chat {chatId}) ---");
+                
+                string myPrivKey = "";
+                if (File.Exists($"{ActiveMail}.key")) myPrivKey = File.ReadAllText($"{ActiveMail}.key");
+
+                foreach(var item in history)
+                {
+                    string displayMsg = "[LOCKED]";
+                    if (!string.IsNullOrEmpty(myPrivKey))
+                    {
+                        try 
+                        {
+                            var sessKey = CryptographyService.DecryptSessionKey(item.MyEncryptedKey, myPrivKey);
+                            displayMsg = CryptographyService.DecryptMessage(item.CipherText, item.IV, sessKey);
+                        }
+                        catch 
+                        {
+                            displayMsg = "[Decryption Error]";
+                        }
+                    }
+                    Console.WriteLine($"[{item.Timestamp.ToShortTimeString()}] {item.Sender}: {displayMsg}");
+                }
+                Console.WriteLine("--------------------------------------------");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Error fetching history] {ex.Message}");
+            }
         }
     }
-    // --- PLAIN MESSAGE ---
-    else
+    catch (Exception ex)
     {
-        if (connection.State == HubConnectionState.Connected)
-            await connection.InvokeAsync("SendMessage", currentUser, input);
-        else
-            Console.WriteLine("[System] Disconnected.");
+        Console.WriteLine($"[Error] {ex.Message}");
     }
+    
 }
 
-// --- HELPERS ---
 async Task ConnectWithRetryAsync(HubConnection connection)
 {
     while (true)
@@ -164,23 +313,21 @@ async Task ConnectWithRetryAsync(HubConnection connection)
         }
         catch
         {
-            Console.WriteLine($"Server unavailable. Retrying in 5s...");
-            await Task.Delay(5000);
+            Console.WriteLine($"Server unavailable. Retrying in 3s...");
+            await Task.Delay(3000);
         }
     }
 }
-
-public class InfiniteRetryPolicy : IRetryPolicy
+public class HistoryItem
 {
-    public TimeSpan? NextRetryDelay(RetryContext retryContext) => TimeSpan.FromSeconds(5);
-}
-
-// Simple DTO for history if you use it later
-public class HistoryItem 
-{
+    public long MessageId { get; set; }
     public string Sender { get; set; }
     public string CipherText { get; set; }
     public string IV { get; set; }
     public string MyEncryptedKey { get; set; }
     public DateTime Timestamp { get; set; }
+}
+public class InfiniteRetryPolicy : IRetryPolicy
+{
+    public TimeSpan? NextRetryDelay(RetryContext retryContext) => TimeSpan.FromSeconds(5);
 }
